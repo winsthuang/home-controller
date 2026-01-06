@@ -6,6 +6,8 @@
 
 This is a smart home automation system that integrates **Miele**, **LG ThinQ**, **HUUM Sauna**, **Phyn Water Monitor**, and **A.O. Smith Water Heater** appliances through MCP (Model Context Protocol) servers. Users can check status and control appliances using natural language or slash commands.
 
+**Automated Email Reports:** Daily (10pm) and weekly (Saturday 8am) email reports with usage stats, historical comparisons, and trends.
+
 ## MCP Servers
 
 Five MCP servers are configured in `.mcp.json`:
@@ -297,6 +299,17 @@ Format output with icons:
 ├── aosmith-mcp-server.js     # A.O. Smith MCP server implementation
 ├── aosmith-mcp-wrapper.sh    # A.O. Smith MCP wrapper script
 ├── test-aosmith-mcp.cjs      # A.O. Smith integration test
+├── email-reports/            # Automated email reporting system
+│   ├── email-report.js       # Main entry point
+│   ├── data-collector.js     # Collects data from all MCP servers
+│   ├── history-store.js      # Historical data storage (12 weeks)
+│   ├── html-templates.js     # Email HTML templates
+│   ├── email-sender.js       # Gmail SMTP sender
+│   └── config.js             # Configuration
+├── launchd/                  # macOS scheduler templates
+│   ├── *.plist.example       # Template plist files
+├── data/                     # Runtime data (gitignored)
+│   └── history.json          # Usage history
 └── .claude/
     ├── commands/         # Slash command definitions
     └── settings.local.json    # Local settings
@@ -312,6 +325,8 @@ From `.env`:
 - `HUUM_USERNAME` / `HUUM_PASSWORD` - HUUM app credentials
 - `PHYN_USERNAME` / `PHYN_PASSWORD` - Phyn app credentials
 - `AOSMITH_EMAIL` / `AOSMITH_PASSWORD` - iComm app credentials
+- `GMAIL_USER` / `GMAIL_APP_PASSWORD` - Gmail SMTP for email reports
+- `REPORT_RECIPIENT` - Email address for reports
 
 ## Tips for Efficient Status Checks
 

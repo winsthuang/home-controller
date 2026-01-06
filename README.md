@@ -37,6 +37,14 @@ A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, Ph
 - View energy consumption data
 - Check hot water availability status
 
+### Automated Email Reports
+- **Daily reports** at 10pm with usage recap
+- **Weekly reports** on Saturday 8am with trends
+- Tracks: water usage, laundry cycles, sauna sessions, oven uses
+- Historical comparisons: vs yesterday, 7-day avg, 4-week avg, 12-week avg
+- 12-week sparkline trends in weekly reports
+- Gmail SMTP with macOS launchd scheduling
+
 ### Slash Commands
 - `/laundry-status` - Quick check on washers and dryers
 - `/kitchen-status` - Check all Miele kitchen appliances
@@ -224,6 +232,52 @@ The A.O. Smith MCP server uses the same Node.js dependencies:
 ```bash
 npm install
 ```
+
+### Email Reports Setup
+
+#### Step 1: Configure Gmail SMTP
+
+1. Enable 2-Factor Authentication on your Gmail account
+2. Go to Google Account → Security → App passwords
+3. Generate an app password for "Mail"
+4. Add to `.env`:
+   ```env
+   GMAIL_USER=your-email@gmail.com
+   GMAIL_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+   REPORT_RECIPIENT=recipient@email.com
+   ```
+
+#### Step 2: Test Email Reports
+
+```bash
+# Test daily report
+node email-reports/email-report.js daily
+
+# Test weekly report
+node email-reports/email-report.js weekly
+```
+
+#### Step 3: Schedule with launchd (macOS)
+
+1. Copy and customize the template plist files:
+   ```bash
+   cp launchd/com.homecontroller.daily-report.plist.example launchd/com.homecontroller.daily-report.plist
+   cp launchd/com.homecontroller.weekly-report.plist.example launchd/com.homecontroller.weekly-report.plist
+   ```
+
+2. Edit the plist files to replace `/path/to/Home Controller` with your actual path
+
+3. Install the launchd jobs:
+   ```bash
+   cp launchd/*.plist ~/Library/LaunchAgents/
+   launchctl load ~/Library/LaunchAgents/com.homecontroller.daily-report.plist
+   launchctl load ~/Library/LaunchAgents/com.homecontroller.weekly-report.plist
+   ```
+
+4. Verify they're loaded:
+   ```bash
+   launchctl list | grep homecontroller
+   ```
 
 ## Testing Your Setup
 
