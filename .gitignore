@@ -63,3 +63,10 @@ venv/
 # Test outputs
 test-output/
 *.test.log
+
+# Runtime data
+data/
+logs/
+
+# Launchd plists (contain user-specific paths)
+launchd/*.plist

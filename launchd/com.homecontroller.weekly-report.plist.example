@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.homecontroller.weekly-report</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/node</string>
+        <string>/path/to/Home Controller/email-reports/email-report.js</string>
+        <string>weekly</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <!-- Saturday = 6 (Sunday = 0, Monday = 1, ..., Saturday = 6) -->
+        <key>Weekday</key>
+        <integer>6</integer>
+        <key>Hour</key>
+        <integer>8</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>WorkingDirectory</key>
+    <string>/path/to/Home Controller</string>
+
+    <key>StandardOutPath</key>
+    <string>/path/to/Home Controller/logs/launchd-weekly.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/path/to/Home Controller/logs/launchd-weekly-error.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
