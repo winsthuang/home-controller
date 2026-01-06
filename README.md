@@ -1,6 +1,6 @@
 # Home Controller - Smart Home MCP Integration
 
-A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, and Phyn Water Monitor appliances through Claude Code using the Model Context Protocol (MCP).
+A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, Phyn Water Monitor, and A.O. Smith Water Heater appliances through Claude Code using the Model Context Protocol (MCP).
 
 ## Features
 
@@ -30,6 +30,13 @@ A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, an
 - Support for multiple Phyn devices (Plus and Smart Sensors)
 - Perfect for building water usage reports
 
+### A.O. Smith Water Heater Integration (Custom Node.js MCP Server)
+- Monitor heat pump water heater temperature and status
+- Set target water temperature (95-140°F)
+- Change operation mode (Heat Pump, Hybrid, Electric, Vacation)
+- View energy consumption data
+- Check hot water availability status
+
 ### Slash Commands
 - `/laundry-status` - Quick check on washers and dryers
 - `/kitchen-status` - Check all Miele kitchen appliances
@@ -42,6 +49,8 @@ A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, an
 - `/check-alerts` - Check for notifications and alerts
 - `/water-status` - Check water system pressure and flow
 - `/water-report` - Get water consumption report
+- `/water-heater-status` - Check heat pump water heater status
+- `/set-water-heater` - Interactive water heater control
 
 ## Prerequisites
 
@@ -63,6 +72,11 @@ A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, an
 4. **For Phyn Water Monitor:**
    - Phyn Plus and/or Phyn Smart Water Sensors
    - Phyn mobile app account
+   - Node.js v18+ installed
+
+5. **For A.O. Smith Water Heater:**
+   - A.O. Smith iComm-enabled water heater (Voltex, etc.)
+   - iComm mobile app account
    - Node.js v18+ installed
 
 ## Setup
@@ -185,6 +199,32 @@ The Phyn MCP server uses the same Node.js dependencies plus the Cognito library:
 npm install
 ```
 
+### A.O. Smith Water Heater Setup
+
+#### Step 1: Get iComm Account Credentials
+
+1. Download the A.O. Smith iComm mobile app (iOS/Android)
+2. Create an account or log in
+3. Connect your iComm-enabled water heater
+4. Note your login credentials (email and password)
+
+#### Step 2: Configure A.O. Smith Environment
+
+1. Edit `.env` and add your credentials:
+   ```env
+   AOSMITH_EMAIL=your_email@example.com
+   AOSMITH_PASSWORD=your_password_here
+   ```
+
+**Note:** The A.O. Smith API uses the same credentials you use in the iComm mobile app.
+
+#### Step 3: Install Dependencies
+
+The A.O. Smith MCP server uses the same Node.js dependencies:
+```bash
+npm install
+```
+
 ## Testing Your Setup
 
 ### Test Miele Integration
@@ -231,6 +271,20 @@ This will:
 3. Get all Phyn devices
 4. Get current device status (pressure, temperature, flow)
 5. Get water consumption data
+
+### Test A.O. Smith Water Heater Integration
+
+```bash
+# Test the A.O. Smith MCP server
+node test-aosmith-mcp.cjs
+```
+
+This will:
+1. Initialize the A.O. Smith MCP server
+2. List available tools
+3. Get all water heaters
+4. Get current device status (temperature, mode, hot water status)
+5. Get energy usage data
 
 ## Available Tools
 
@@ -304,11 +358,38 @@ Open or close the main water shutoff valve (Phyn Plus only).
   - `device_id` (string)
   - `action` (string): "open" or "close"
 
+### A.O. Smith Water Heater MCP Server
+
+#### `get_devices`
+Get all A.O. Smith water heaters linked to your iComm account.
+
+#### `get_device_status`
+Get detailed status for a specific water heater.
+- Parameters: `junction_id` (string)
+- Returns: temperature setpoint, mode, hot water status, online status
+
+#### `set_temperature`
+Set the target water temperature.
+- Parameters:
+  - `junction_id` (string)
+  - `temperature` (number): Target temperature in Fahrenheit (95-140)
+
+#### `set_mode`
+Change the water heater operation mode.
+- Parameters:
+  - `junction_id` (string)
+  - `mode` (string): "HEAT_PUMP", "HYBRID", "ELECTRIC", or "VACATION"
+
+#### `get_energy_usage`
+Get energy consumption data for a water heater.
+- Parameters: `junction_id` (string)
+- Returns: lifetime kWh, average daily usage, recent usage history
+
 ## Using with Claude Code
 
 ### Project-Level Configuration (Recommended)
 
-The `.mcp.json` file in this directory configures all four servers:
+The `.mcp.json` file in this directory configures all five servers:
 
 ```json
 {
@@ -331,6 +412,11 @@ The `.mcp.json` file in this directory configures all four servers:
     "phyn": {
       "type": "stdio",
       "command": "/absolute/path/to/phyn-mcp-wrapper.sh",
+      "args": []
+    },
+    "aosmith": {
+      "type": "stdio",
+      "command": "/absolute/path/to/aosmith-mcp-wrapper.sh",
       "args": []
     }
   }
@@ -364,6 +450,8 @@ Slash commands are available in `.claude/commands/`:
 - **`/check-alerts`** - View notifications and completed cycles
 - **`/water-status`** - Check water pressure and flow
 - **`/water-report`** - Get water consumption report
+- **`/water-heater-status`** - Check heat pump water heater status
+- **`/set-water-heater`** - Interactive water heater control
 
 ## Example Usage
 
@@ -380,9 +468,13 @@ Once configured in Claude Code, you can use natural language:
 "What's my water pressure?"
 "How much water did I use this month?"
 "Shut off the water"
+"What's my water heater temperature?"
+"Set water heater to 120 degrees"
+"Put water heater in vacation mode"
 "/laundry-status"
 "/sauna-status"
 "/water-status"
+"/water-heater-status"
 ```
 
 ## Troubleshooting
@@ -459,6 +551,23 @@ Once configured in Claude Code, you can use natural language:
 - Smart Water Sensors (PW1) are monitoring-only
 - Ensure the valve is not manually locked
 
+### A.O. Smith Water Heater Issues
+
+**"401 Unauthorized" or authentication errors**
+- Verify your iComm credentials in `.env`
+- Ensure you're using the same email/password as the iComm mobile app
+- Try logging out and back into the iComm app to verify credentials
+
+**Water heater not responding**
+- Check that the water heater is powered on and connected to WiFi
+- Verify the water heater is online in the iComm mobile app
+- Ensure your iComm account is connected to the water heater
+
+**Energy data not available**
+- Energy tracking may need to be enabled in the iComm app
+- Some older models may not support energy monitoring
+- Wait for the water heater to collect usage data
+
 ### MCP Server Issues
 
 **Servers not loading in Claude Code**
@@ -484,6 +593,9 @@ HUUM uses your mobile app login credentials. No token refresh needed - credentia
 ### Phyn Credentials
 Phyn uses AWS Cognito authentication with your mobile app login credentials. Tokens are automatically refreshed by the MCP server. No manual maintenance needed.
 
+### A.O. Smith Credentials
+A.O. Smith uses JWT authentication with your iComm mobile app login credentials. Tokens are automatically refreshed by the MCP server. No manual maintenance needed.
+
 ## Project Structure
 
 ```
@@ -495,15 +607,18 @@ Home Controller/
 ├── index.js                 # Miele MCP server (Node.js)
 ├── huum-mcp-server.js       # HUUM Sauna MCP server (Node.js)
 ├── phyn-mcp-server.js       # Phyn Water Monitor MCP server (Node.js)
+├── aosmith-mcp-server.js    # A.O. Smith Water Heater MCP server (Node.js)
 ├── auth.js                  # Miele OAuth helper
 ├── miele-mcp-wrapper.sh     # Miele MCP server wrapper
 ├── lg-thinq-mcp-wrapper.sh  # LG ThinQ MCP server wrapper
 ├── huum-mcp-wrapper.sh      # HUUM MCP server wrapper
 ├── phyn-mcp-wrapper.sh      # Phyn MCP server wrapper
+├── aosmith-mcp-wrapper.sh   # A.O. Smith MCP server wrapper
 ├── test-miele-mcp.cjs       # Miele integration test
 ├── test-lg-dryer.cjs        # LG ThinQ integration test
 ├── test-huum-sauna.cjs      # HUUM integration test
 ├── test-phyn-mcp.cjs        # Phyn integration test
+├── test-aosmith-mcp.cjs     # A.O. Smith integration test
 ├── package.json             # Node.js dependencies
 ├── README.md                # This file
 ├── INSTRUCTIONS.md          # User guide
@@ -520,7 +635,9 @@ Home Controller/
         ├── stop-sauna.md
         ├── check-alerts.md
         ├── water-status.md
-        └── water-report.md
+        ├── water-report.md
+        ├── water-heater-status.md
+        └── set-water-heater.md
 ```
 
 ## Security Notes
@@ -553,6 +670,12 @@ Home Controller/
 - [Phyn Plus](https://www.phyn.com/products/phyn-plus-smart-water-assistant-shutoff-v2/)
 - [Phyn Smart Water Sensor](https://www.phyn.com/products/phyn/)
 - [aiophyn Library](https://github.com/jordanruthe/aiophyn) (Python API reference)
+
+### A.O. Smith Water Heater
+- [iComm Mobile App](https://www.hotwater.com/resources/mobile-apps.html) (iOS/Android)
+- [A.O. Smith Heat Pump Water Heaters](https://www.hotwater.com/products/residential/electric/heat-pump/)
+- [py-aosmith Library](https://github.com/bdr99/py-aosmith) (Python API reference)
+- [Home Assistant Integration](https://www.home-assistant.io/integrations/aosmith/)
 
 ### General
 - [Model Context Protocol](https://modelcontextprotocol.io/)

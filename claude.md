@@ -4,11 +4,11 @@
 
 ## Project Overview
 
-This is a smart home automation system that integrates **Miele**, **LG ThinQ**, **HUUM Sauna**, and **Phyn Water Monitor** appliances through MCP (Model Context Protocol) servers. Users can check status and control appliances using natural language or slash commands.
+This is a smart home automation system that integrates **Miele**, **LG ThinQ**, **HUUM Sauna**, **Phyn Water Monitor**, and **A.O. Smith Water Heater** appliances through MCP (Model Context Protocol) servers. Users can check status and control appliances using natural language or slash commands.
 
 ## MCP Servers
 
-Four MCP servers are configured in `.mcp.json`:
+Five MCP servers are configured in `.mcp.json`:
 
 ### 1. Miele MCP Server
 - **Command:** `./miele-mcp-wrapper.sh` → `node index.js`
@@ -45,6 +45,16 @@ Four MCP servers are configured in `.mcp.json`:
   - `get_consumption` - Get historical water usage (daily/monthly/yearly)
   - `shutoff_valve` - Open/close water shutoff valve (Phyn Plus only)
 
+### 5. A.O. Smith Water Heater MCP Server
+- **Command:** `./aosmith-mcp-wrapper.sh` → `node aosmith-mcp-server.js`
+- **Server Name:** `aosmith-water-heater` v1.0.0
+- **Tools:**
+  - `get_devices` - Get all A.O. Smith water heaters on account
+  - `get_device_status` - Get detailed status (temp, mode, online status)
+  - `set_temperature` - Set target water temperature (95-140°F)
+  - `set_mode` - Change operation mode (HEAT_PUMP, HYBRID, ELECTRIC, VACATION)
+  - `get_energy_usage` - Get energy consumption data (lifetime kWh, daily usage)
+
 ## How to Query MCP Servers
 
 **IMPORTANT:** MCP servers use JSON-RPC over stdio, NOT CLI arguments.
@@ -58,6 +68,7 @@ node test-lg-dryer.cjs      # LG washer/dryer status
 node test-miele-mcp.cjs     # Miele appliances status
 node test-huum-sauna.cjs    # HUUM sauna status
 node test-phyn-mcp.cjs      # Phyn water monitor status
+node test-aosmith-mcp.cjs   # A.O. Smith water heater status
 ```
 
 The test scripts implement proper JSON-RPC protocol and output device status. Use these for quick status checks instead of trying to call MCP binaries directly.
@@ -134,6 +145,27 @@ The test scripts implement proper JSON-RPC protocol and output device status. Us
 - Phyn Plus (PP2) can control water shutoff valve
 - PW1 sensors monitor but cannot control water flow
 
+### A.O. Smith Water Heater
+| Device | API | Access |
+|--------|-----|--------|
+| Heat Pump Water Heater | r2.wh8.co/graphql | iComm app credentials |
+
+**Status Fields (A.O. Smith):**
+- `temperatureSetpoint` - Current target temperature (°F)
+- `temperatureSetpointPending` - Pending temperature change
+- `temperatureSetpointMaximum` - Max allowed temperature
+- `operationMode` - Current mode (HEAT_PUMP, HYBRID, ELECTRIC, VACATION)
+- `operationModePending` - Pending mode change
+- `hotWaterStatus` - Hot water availability
+- `isOnline` - Device connectivity
+- `modeName` - Human-readable mode name
+
+**Notes:**
+- Temperature range: 95-140°F
+- Uses GraphQL API with JWT authentication
+- Same credentials as iComm mobile app
+- Modes: HEAT_PUMP (efficient), HYBRID (balanced), ELECTRIC (fast), VACATION (away)
+
 ## Common Operations
 
 ### Check Laundry Status
@@ -184,6 +216,24 @@ The test scripts implement proper JSON-RPC protocol and output device status. Us
 1. Call Phyn `shutoff_valve` with device_id `28F53743B8D8` and action `close`
 2. To restore water, call with action `open`
 
+### Check Water Heater Status
+1. Call A.O. Smith `get_devices` to list water heaters
+2. Call A.O. Smith `get_device_status` with junction_id
+3. Show: current setpoint, mode, online status, hot water status
+
+### Set Water Heater Temperature
+1. Call A.O. Smith `set_temperature` with junction_id and temperature (95-140°F)
+2. Confirm the pending change
+
+### Change Water Heater Mode
+1. Call A.O. Smith `set_mode` with junction_id and mode
+2. Modes: HEAT_PUMP, HYBRID, ELECTRIC, VACATION
+3. Confirm the pending change
+
+### Get Water Heater Energy Usage
+1. Call A.O. Smith `get_energy_usage` with junction_id
+2. Show: lifetime kWh, average daily usage, recent usage graph
+
 ## Slash Commands
 
 Available in `.claude/commands/`:
@@ -202,6 +252,8 @@ Available in `.claude/commands/`:
 - `/check-alerts` - Check for alerts/notifications
 - `/water-status` - Water system pressure and flow
 - `/water-report` - Water consumption report
+- `/water-heater-status` - Heat pump water heater status
+- `/set-water-heater` - Interactive water heater control
 
 ## Quick Status Check Pattern
 
@@ -211,7 +263,8 @@ When user asks "check status" or similar:
 2. **For kitchen:** Use Miele MCP `get_device_status` for oven, fridge, freezer IDs
 3. **For sauna:** Use HUUM MCP `get_sauna_status`
 4. **For water:** Use Phyn MCP `get_device_status` for Phyn Plus
-5. **For everything:** Call all four servers and query all devices
+5. **For water heater:** Use A.O. Smith MCP `get_devices` or `get_device_status`
+6. **For everything:** Call all five servers and query all devices
 
 Format output with icons:
 - 🧺 Washer
@@ -220,6 +273,7 @@ Format output with icons:
 - ❄️ Refrigerator/Freezer
 - 🧖 Sauna
 - 💧 Water Monitor
+- 🚿 Water Heater
 
 ## File Structure
 
@@ -240,6 +294,9 @@ Format output with icons:
 ├── phyn-mcp-server.js        # Phyn MCP server implementation
 ├── phyn-mcp-wrapper.sh       # Phyn MCP wrapper script
 ├── test-phyn-mcp.cjs         # Phyn integration test
+├── aosmith-mcp-server.js     # A.O. Smith MCP server implementation
+├── aosmith-mcp-wrapper.sh    # A.O. Smith MCP wrapper script
+├── test-aosmith-mcp.cjs      # A.O. Smith integration test
 └── .claude/
     ├── commands/         # Slash command definitions
     └── settings.local.json    # Local settings
@@ -254,6 +311,7 @@ From `.env`:
 - `THINQ_COUNTRY` - US
 - `HUUM_USERNAME` / `HUUM_PASSWORD` - HUUM app credentials
 - `PHYN_USERNAME` / `PHYN_PASSWORD` - Phyn app credentials
+- `AOSMITH_EMAIL` / `AOSMITH_PASSWORD` - iComm app credentials
 
 ## Tips for Efficient Status Checks
 
@@ -271,8 +329,9 @@ From `.env`:
 
 ## Testing
 
-All four MCP servers have been tested and are confirmed working:
+All five MCP servers have been tested and are confirmed working:
 - `node test-lg-dryer.cjs` - Test LG ThinQ integration (washer + dryer)
 - `node test-miele-mcp.cjs` - Test Miele integration (oven, fridge, freezer)
 - `node test-huum-sauna.cjs` - Test HUUM sauna integration
 - `node test-phyn-mcp.cjs` - Test Phyn water monitor integration
+- `node test-aosmith-mcp.cjs` - Test A.O. Smith water heater integration

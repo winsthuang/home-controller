@@ -19,10 +19,14 @@ Use MCP tools to get a complete status of all appliances:
 1. Call `get_devices` to list all Phyn devices
 2. Call `get_device_status` for the Phyn Plus (device_id: 28F53743B8D8)
 
+**A.O. Smith Water Heater:**
+1. Call `get_devices` to list all water heaters
+2. Show temperature setpoint, mode, and hot water status
+
 Show for each device:
 - Device name and type
 - Current status (on/off, running, idle, etc.)
-- Important info: temperatures for kitchen appliances, time remaining for washer/dryer, pressure/flow for water
+- Important info: temperatures for kitchen appliances, time remaining for washer/dryer, pressure/flow for water, setpoint/mode for water heater
 - Any alerts or notifications
 
 Format: Use appropriate icons and keep it concise - just key info:
@@ -32,3 +36,4 @@ Format: Use appropriate icons and keep it concise - just key info:
 - 👕 Dryer
 - 🧖 Sauna
 - 💧 Water Monitor
+- 🚿 Water Heater

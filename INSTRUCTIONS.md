@@ -1,6 +1,6 @@
 # Home Controller - Simple User Guide
 
-Welcome! This guide will help you control your home appliances (Miele, LG ThinQ, HUUM Sauna, and Phyn Water Monitor) using Claude Code. No technical expertise required!
+Welcome! This guide will help you control your home appliances (Miele, LG ThinQ, HUUM Sauna, Phyn Water Monitor, and A.O. Smith Water Heater) using Claude Code. No technical expertise required!
 
 ## What Can I Do?
 
@@ -13,8 +13,10 @@ You can control and monitor your home appliances by talking to Claude Code in na
 - "What's the sauna temperature?"
 - "What's my water pressure?"
 - "How much water did I use this month?"
+- "What's my water heater temperature?"
+- "Set water heater to 120 degrees"
 
-You can also use quick slash commands like `/laundry-status`, `/sauna-status`, or `/water-status` to get instant updates.
+You can also use quick slash commands like `/laundry-status`, `/sauna-status`, `/water-status`, or `/water-heater-status` to get instant updates.
 
 ## Getting Started from Scratch
 
@@ -76,6 +78,10 @@ Once Claude Code is running, you can use these quick commands by typing them dir
 - `/water-status` - Check water pressure, temperature, and flow
 - `/water-report` - Get water consumption report (daily/monthly)
 
+### Water Heater Commands
+- `/water-heater-status` - Check water heater temperature, mode, and status
+- `/set-water-heater` - Get help changing water heater settings
+
 ### General Commands
 - `/home-status` - See the status of ALL your appliances at once
 - `/miele-status` - Check all Miele appliances
@@ -110,6 +116,13 @@ You don't need to memorize commands! Just talk to Claude naturally:
 - "Check my water system"
 - "Shut off the water" (emergency shutoff)
 - "Open the water valve"
+
+### Examples for Water Heater
+- "What's my water heater temperature?"
+- "Set the water heater to 120 degrees"
+- "Put the water heater in heat pump mode"
+- "Is there hot water available?"
+- "Put water heater in vacation mode"
 
 ### Examples for General Use
 - "What appliances do I have?"
@@ -151,6 +164,13 @@ When you check water status, you'll see:
 When you get a water report, you'll see:
 - **Total Consumption:** Gallons used in the period
 - **Period:** Time range covered (day/month/year)
+
+### Water Heater Status
+When you check water heater status, you'll see:
+- **Temperature:** Current setpoint in Fahrenheit
+- **Mode:** Current operation mode (Heat Pump, Hybrid, Electric, Vacation)
+- **Hot Water Status:** Availability level (High, Medium, Low)
+- **Online:** Device connectivity status
 
 ## Troubleshooting
 
@@ -194,6 +214,12 @@ Your Miele access token has expired (they last 30 days). To refresh:
 - Smart Water Sensors (PW1) are monitoring-only
 - Check that the valve is not manually locked
 
+### Water Heater Not Responding
+- Check that your water heater is connected to WiFi
+- Verify the water heater is online in the iComm mobile app
+- Ensure your iComm credentials are correct in the `.env` file
+- Try logging out and back into the iComm app
+
 ## Common Scenarios
 
 ### Scenario 1: Check if Laundry is Done
@@ -235,6 +261,18 @@ Your Miele access token has expired (they last 30 days). To refresh:
 3. The Phyn Plus will close the main water valve
 4. To restore, say: "Open the water valve"
 
+### Scenario 8: Going on Vacation
+1. Start Claude Code
+2. Say: "Put the water heater in vacation mode"
+3. The water heater will switch to energy-saving mode
+4. When you return, say: "Set water heater to hybrid mode"
+
+### Scenario 9: Check Water Heater Before Guests Arrive
+1. Start Claude Code
+2. Type: `/water-heater-status`
+3. If hot water is low, say: "Set water heater to electric mode" for fastest recovery
+4. Once guests leave, switch back: "Set water heater to heat pump mode"
+
 ## Tips for Best Results
 
 1. **Be Specific:** Instead of "check that", say "check the washer" or "check the oven"
@@ -263,12 +301,15 @@ Based on your setup, you should have access to:
 - Phyn Plus (main water shutoff valve)
 - Smart Water Sensors (HVAC, Hot Water Heater, etc.)
 
+### A.O. Smith Water Heater
+- Heat Pump Water Heater (iComm-enabled)
+
 To see your complete list, just ask: "What appliances do I have?" or type `/home-status`
 
 ## Security & Privacy
 
 - Your credentials are stored locally on your computer (in the `.env` file)
-- Nothing is sent to the cloud except standard API calls to Miele, LG, and HUUM
+- Nothing is sent to the cloud except standard API calls to Miele, LG, HUUM, Phyn, and A.O. Smith
 - Your tokens are never shared with anyone
 - The `.env` file is excluded from git to prevent accidental sharing
 
@@ -286,17 +327,19 @@ Save this for easy access:
 
 ```
 QUICK COMMANDS:
-/laundry-status    → Washer & Dryer status
-/kitchen-status    → All kitchen appliances
-/sauna-status      → Sauna temperature & status
-/water-status      → Water pressure & flow
-/water-report      → Water consumption report
-/home-status       → All appliances
-/fridge-status     → Fridge & freezer temps
-/oven-status       → Oven status
-/start-sauna       → Start sauna heating
-/stop-sauna        → Turn off sauna
-/check-alerts      → Any alerts or issues
+/laundry-status       → Washer & Dryer status
+/kitchen-status       → All kitchen appliances
+/sauna-status         → Sauna temperature & status
+/water-status         → Water pressure & flow
+/water-report         → Water consumption report
+/water-heater-status  → Water heater temp & mode
+/set-water-heater     → Change water heater settings
+/home-status          → All appliances
+/fridge-status        → Fridge & freezer temps
+/oven-status          → Oven status
+/start-sauna          → Start sauna heating
+/stop-sauna           → Turn off sauna
+/check-alerts         → Any alerts or issues
 
 NATURAL LANGUAGE EXAMPLES:
 "Is my laundry done?"
@@ -306,6 +349,8 @@ NATURAL LANGUAGE EXAMPLES:
 "What's the sauna temperature?"
 "What's my water pressure?"
 "How much water did I use this month?"
+"What's my water heater temperature?"
+"Set water heater to 120 degrees"
 "Start the washer"
 "Show me everything"
 
