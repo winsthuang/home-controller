@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+
+# Environment variables and credentials
+.env
+.env.local
+.env.*.local
+
+# MCP configuration (contains user-specific paths)
+.mcp.json
+
+# MCP wrapper scripts (contain hardcoded paths/credentials)
+*-wrapper.sh
+*-mcp-wrapper.sh
+
+# Test scripts with hardcoded paths
+test-miele.sh
+
+# Python scripts with potential credentials
+test-lg-mcp.py
+query-lg-laundry.py
+laundry-status.py
+
+# Backups
+*.backup
+.mcp.json.backup
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Claude Code
+.claude/session-env/
+.claude/debug/
+.claude/todos/
+.claude/history.jsonl
+.claude/settings.local.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test outputs
+test-output/
+*.test.log

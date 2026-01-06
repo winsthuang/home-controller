@@ -1,0 +1,9 @@
+#!/bin/bash
+# Wrapper script for LG ThinQ MCP server
+# This sets the required environment variables before starting the server
+
+export THINQ_PAT="your_thinq_personal_access_token_here"
+export THINQ_COUNTRY="US"
+
+# Start the MCP server
+exec /Users/YOURUSERNAME/.local/bin/thinqconnect-mcp

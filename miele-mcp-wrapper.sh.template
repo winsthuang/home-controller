@@ -1,0 +1,10 @@
+#!/bin/bash
+# Wrapper script for Miele MCP server
+# This sets the required environment variables before starting the server
+
+export MIELE_ACCESS_TOKEN="your_miele_access_token_here"
+export MIELE_API_BASE_URL="https://api.mcs3.miele.com/v1"
+
+# Start the MCP server (Node.js)
+cd "$(dirname "$0")"
+exec node index.js

@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "miele": {
+      "type": "stdio",
+      "command": "/ABSOLUTE/PATH/TO/PROJECT/miele-mcp-wrapper.sh",
+      "args": []
+    },
+    "lg-thinq": {
+      "type": "stdio",
+      "command": "/ABSOLUTE/PATH/TO/PROJECT/lg-thinq-mcp-wrapper.sh",
+      "args": []
+    }
+  }
+}

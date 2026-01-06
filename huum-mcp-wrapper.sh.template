@@ -1,0 +1,14 @@
+#!/bin/bash
+# Wrapper script for HUUM Sauna MCP server
+# This ensures the environment variables are loaded before starting the server
+
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Load environment variables from .env file
+if [ -f "$SCRIPT_DIR/.env" ]; then
+  export $(grep -v '^#' "$SCRIPT_DIR/.env" | xargs)
+fi
+
+# Start the MCP server
+exec node "$SCRIPT_DIR/huum-mcp-server.js"

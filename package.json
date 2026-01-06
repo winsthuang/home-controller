@@ -1,0 +1,25 @@
+{
+  "name": "home-controller",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "auth": "node auth.js"
+  },
+  "keywords": [
+    "miele",
+    "mcp",
+    "home-automation"
+  ],
+  "author": "",
+  "license": "ISC",
+  "description": "MCP server for controlling Miele home appliances",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.1",
+    "amazon-cognito-identity-js": "^6.3.16",
+    "axios": "^1.13.2",
+    "dotenv": "^17.2.3"
+  }
+}
