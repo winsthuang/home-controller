@@ -284,6 +284,18 @@ Yesterday:         ${yesterday ? (yesterday.ovenUsed ? '1' : '0') + ' use' : 'N/
       </div>
     </div>
 
+    <div class="section">
+      <div class="section-title">🔐 SMART LOCKS</div>
+      <div class="box">
+<pre>Locks Connected:   ${data.smartLocks?.lockCount || 0}
+${(data.smartLocks?.locks || []).map(lock => `${lock.name}: ${lock.isConnected ? lock.lockState : 'Offline'}${lock.batteryLevel ? ` (${lock.batteryLevel}%)` : ''}`).join('\n') || 'No locks configured'}
+
+Today's Activity:
+  Locks:           ${data.smartLocks?.todayLocks || 0}
+  Unlocks:         ${data.smartLocks?.todayUnlocks || 0}</pre>
+      </div>
+    </div>
+
     <div class="footer">
       ✓ Report generated at ${new Date().toLocaleTimeString()}
     </div>
@@ -399,6 +411,18 @@ vs 12-Week Avg:    ${avg12Week ? formatChangeArrow(thisWeek?.ovenUses || 0, avg1
       </div>
     </div>
 
+    <div class="section">
+      <div class="section-title">🔐 SMART LOCKS</div>
+      <div class="box">
+<pre>Locks Connected:   ${data.smartLocks?.lockCount || 0}
+${(data.smartLocks?.locks || []).map(lock => `${lock.name}: ${lock.isConnected ? lock.lockState : 'Offline'}${lock.batteryLevel ? ` (${lock.batteryLevel}%)` : ''}`).join('\n') || 'No locks configured'}
+
+This Week's Activity:
+  Total Locks:     ${thisWeek?.lockEvents || data.smartLocks?.todayLocks || 0}${lastWeek?.lockEvents ? ` (vs ${lastWeek.lockEvents} last week)` : ''}
+  Total Unlocks:   ${thisWeek?.unlockEvents || data.smartLocks?.todayUnlocks || 0}${lastWeek?.unlockEvents ? ` (vs ${lastWeek.unlockEvents} last week)` : ''}</pre>
+      </div>
+    </div>
+
     <div class="footer">
       ✓ Weekly report generated at ${new Date().toLocaleString()}
     </div>
@@ -445,6 +469,11 @@ export function generatePlainText(data, reportType) {
 
   lines.push('🧖 SAUNA');
   lines.push(`   Week-to-date: ${weekToDate?.saunaSessions || 0} sessions`);
+
+  lines.push('🔐 SMART LOCKS');
+  lines.push(`   Connected: ${data.smartLocks?.lockCount || 0}`);
+  lines.push(`   Today's Locks: ${data.smartLocks?.todayLocks || 0}`);
+  lines.push(`   Today's Unlocks: ${data.smartLocks?.todayUnlocks || 0}`);
 
   if (data.errors?.length > 0) {
     lines.push('');

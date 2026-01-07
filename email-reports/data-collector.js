@@ -422,18 +422,106 @@ async function collectAOSmithData() {
 }
 
 /**
+ * Collect data from Tedee Smart Lock MCP
+ */
+async function collectTedeeData() {
+  try {
+    const { server, responses } = await createMCPClient('./tedee-mcp-wrapper.sh');
+
+    await initializeMCP(server);
+
+    // Get device list first (has names)
+    const devicesResponse = await callTool(server, responses, 'get_devices', {}, 59);
+    let deviceNames = {};
+    if (devicesResponse?.result?.content?.[0]?.text) {
+      try {
+        const data = JSON.parse(devicesResponse.result.content[0].text);
+        (data.locks || []).forEach(lock => {
+          deviceNames[lock.id] = lock.name;
+        });
+      } catch (e) {}
+    }
+
+    // Sync all locks to get current status
+    const syncResponse = await callTool(server, responses, 'sync_all_locks', {}, 60);
+
+    let locks = [];
+    if (syncResponse?.result?.content?.[0]?.text) {
+      try {
+        const data = JSON.parse(syncResponse.result.content[0].text);
+        locks = (data.locks || []).map(lock => ({
+          ...lock,
+          name: deviceNames[lock.id] || lock.name || `Lock ${lock.id}`
+        }));
+      } catch (e) {}
+    }
+
+    // Get activity logs for each lock to count lock/unlock events
+    let totalLocks = 0;
+    let totalUnlocks = 0;
+
+    for (let i = 0; i < locks.length; i++) {
+      const lock = locks[i];
+      const activityResponse = await callTool(server, responses, 'get_activity_log',
+        { lock_id: lock.id, count: 200 }, 61 + i);
+
+      if (activityResponse?.result?.content?.[0]?.text) {
+        try {
+          const data = JSON.parse(activityResponse.result.content[0].text);
+          const activities = data.activities || [];
+
+          // Filter to last 24 hours
+          const oneDayAgo = new Date();
+          oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+
+          for (const activity of activities) {
+            const activityDate = new Date(activity.date);
+            if (activityDate >= oneDayAgo) {
+              if (activity.event_code === 1) totalLocks++;  // Lock event
+              if (activity.event_code === 2) totalUnlocks++;  // Unlock event
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    server.kill();
+
+    return {
+      success: true,
+      locks: locks.map(lock => ({
+        id: lock.id,
+        name: lock.name,
+        isConnected: lock.is_connected,
+        lockState: lock.lock_state,
+        lockStateCode: lock.lock_state_code,
+        doorState: lock.door_state,
+        batteryLevel: lock.battery_level,
+        isCharging: lock.is_charging
+      })),
+      lockCount: locks.length,
+      todayLocks: totalLocks,
+      todayUnlocks: totalUnlocks
+    };
+  } catch (error) {
+    return { success: false, error: error.message, locks: [], lockCount: 0, todayLocks: 0, todayUnlocks: 0 };
+  }
+}
+
+/**
  * Collect data from all MCP servers in parallel
  */
 export async function collectAllData() {
   const timestamp = new Date().toISOString();
 
   // Run all collectors in parallel
-  const [lgData, mieleData, huumData, phynData, aosmithData] = await Promise.all([
+  const [lgData, mieleData, huumData, phynData, aosmithData, tedeeData] = await Promise.all([
     collectLGData().catch(e => ({ success: false, error: e.message })),
     collectMieleData().catch(e => ({ success: false, error: e.message })),
     collectHUUMData().catch(e => ({ success: false, error: e.message })),
     collectPhynData().catch(e => ({ success: false, error: e.message })),
-    collectAOSmithData().catch(e => ({ success: false, error: e.message }))
+    collectAOSmithData().catch(e => ({ success: false, error: e.message })),
+    collectTedeeData().catch(e => ({ success: false, error: e.message, locks: [], lockCount: 0, todayLocks: 0, todayUnlocks: 0 }))
   ]);
 
   // Collect any errors
@@ -443,6 +531,7 @@ export async function collectAllData() {
   if (!huumData.success) errors.push(`HUUM: ${huumData.error}`);
   if (!phynData.success) errors.push(`Phyn: ${phynData.error}`);
   if (!aosmithData.success) errors.push(`A.O. Smith: ${aosmithData.error}`);
+  if (!tedeeData.success) errors.push(`Tedee: ${tedeeData.error}`);
 
   return {
     timestamp,
@@ -477,6 +566,12 @@ export async function collectAllData() {
       isOnline: aosmithData.isOnline,
       lifetimeKwh: aosmithData.lifetimeKwh,
       dailyUsage: aosmithData.dailyUsage
+    },
+    smartLocks: {
+      locks: tedeeData.locks || [],
+      lockCount: tedeeData.lockCount || 0,
+      todayLocks: tedeeData.todayLocks || 0,
+      todayUnlocks: tedeeData.todayUnlocks || 0
     },
     errors
   };

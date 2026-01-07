@@ -1,6 +1,6 @@
 # Home Controller - Smart Home MCP Integration
 
-A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, Phyn Water Monitor, and A.O. Smith Water Heater appliances through Claude Code using the Model Context Protocol (MCP).
+A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, Phyn Water Monitor, A.O. Smith Water Heater, and Tedee Smart Lock appliances through Claude Code using the Model Context Protocol (MCP).
 
 ## Features
 
@@ -37,6 +37,15 @@ A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, Ph
 - View energy consumption data
 - Check hot water availability status
 
+### Tedee Smart Lock Integration (Custom Node.js MCP Server)
+- Monitor lock status (locked/unlocked/semi-locked)
+- Check door state (open/closed)
+- Lock and unlock doors remotely
+- View battery level and charging status
+- Access lock activity history
+- Support for multiple locks
+- Requires Tedee bridge for remote access
+
 ### Automated Email Reports
 - **Daily reports** at 10pm with usage recap
 - **Weekly reports** on Saturday 8am with trends
@@ -59,6 +68,10 @@ A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, Ph
 - `/water-report` - Get water consumption report
 - `/water-heater-status` - Check heat pump water heater status
 - `/set-water-heater` - Interactive water heater control
+- `/get_device_status` - Check smart lock status
+- `/lock_doors` - Lock one or all doors
+- `/unlock_doors` - Unlock one or all doors
+- `/get_activity_logs` - View lock activity history
 
 ## Prerequisites
 
@@ -85,6 +98,13 @@ A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, Ph
 5. **For A.O. Smith Water Heater:**
    - A.O. Smith iComm-enabled water heater (Voltex, etc.)
    - iComm mobile app account
+   - Node.js v18+ installed
+
+6. **For Tedee Smart Locks:**
+   - Tedee smart lock (GO or PRO)
+   - Tedee bridge (required for remote API access)
+   - Tedee mobile app account
+   - Personal Access Key (PAK) from Tedee Portal
    - Node.js v18+ installed
 
 ## Setup
@@ -233,6 +253,42 @@ The A.O. Smith MCP server uses the same Node.js dependencies:
 npm install
 ```
 
+### Tedee Smart Lock Setup
+
+#### Step 1: Get Personal Access Key (PAK)
+
+1. Log in to [Tedee Portal](https://portal.tedee.com/)
+2. Click your initials in the upper right corner
+3. Select "Personal Access Keys"
+4. Click "Add Key"
+5. Enter a name (e.g., "Home Controller")
+6. Set validity period (up to 5 years)
+7. Select permissions:
+   - Device - Read (required)
+   - Lock - Operate (required for lock/unlock)
+   - Device Activity - Read (required for activity logs)
+8. **Save the key immediately** - it won't be shown again!
+
+#### Step 2: Configure Tedee Environment
+
+1. Edit `.env` and add your PAK:
+   ```env
+   TEDEE_API_KEY=your_personal_access_key_here
+   ```
+
+**Note:** The Tedee API uses Personal Access Keys for authentication. These are different from OAuth - they're simple API keys that work directly with the Tedee cloud API.
+
+#### Step 3: Ensure Bridge Connection
+
+Your Tedee lock must be connected via a Tedee bridge for remote API access. If you only have Bluetooth connection, the API will not be able to communicate with your lock.
+
+#### Step 4: Install Dependencies
+
+The Tedee MCP server uses the same Node.js dependencies:
+```bash
+npm install
+```
+
 ### Email Reports Setup
 
 #### Step 1: Configure Gmail SMTP
@@ -340,6 +396,21 @@ This will:
 4. Get current device status (temperature, mode, hot water status)
 5. Get energy usage data
 
+### Test Tedee Smart Lock Integration
+
+```bash
+# Test the Tedee MCP server
+node test-tedee-mcp.cjs
+```
+
+This will:
+1. Initialize the Tedee MCP server
+2. List available tools
+3. Get all locks
+4. Sync all lock states
+5. Get current device status (lock state, battery, door state)
+6. Get recent activity log
+
 ## Available Tools
 
 ### Miele MCP Server
@@ -439,11 +510,52 @@ Get energy consumption data for a water heater.
 - Parameters: `junction_id` (string)
 - Returns: lifetime kWh, average daily usage, recent usage history
 
+### Tedee Smart Lock MCP Server
+
+#### `get_devices`
+Get all Tedee smart locks linked to your account.
+
+#### `get_device_status`
+Get detailed status for a specific lock.
+- Parameters: `lock_id` (number)
+- Returns: lock state, door state, battery level, connection status
+
+#### `sync_all_locks`
+Refresh and get current status of all locks.
+- Returns: Array of all locks with current states
+
+#### `lock_door`
+Lock a specific door.
+- Parameters: `lock_id` (number)
+- Returns: operation ID for tracking
+
+#### `unlock_door`
+Unlock a specific door.
+- Parameters:
+  - `lock_id` (number)
+  - `mode` (number, optional): 2=force, 3=no auto-pull, 4=unlock or pull
+
+#### `pull_spring`
+Pull spring (for locks with auto-pull disabled).
+- Parameters: `lock_id` (number)
+
+#### `get_operation_status`
+Check the status of an async lock/unlock operation.
+- Parameters: `operation_id` (string)
+- Returns: status (PENDING/COMPLETED), result code
+
+#### `get_activity_log`
+Get recent activity history for a lock.
+- Parameters:
+  - `lock_id` (number)
+  - `count` (number): max 200 events
+- Returns: Array of events with timestamps, users, and sources
+
 ## Using with Claude Code
 
 ### Project-Level Configuration (Recommended)
 
-The `.mcp.json` file in this directory configures all five servers:
+The `.mcp.json` file in this directory configures all six servers:
 
 ```json
 {
@@ -471,6 +583,11 @@ The `.mcp.json` file in this directory configures all five servers:
     "aosmith": {
       "type": "stdio",
       "command": "/absolute/path/to/aosmith-mcp-wrapper.sh",
+      "args": []
+    },
+    "tedee": {
+      "type": "stdio",
+      "command": "/absolute/path/to/tedee-mcp-wrapper.sh",
       "args": []
     }
   }
@@ -506,6 +623,10 @@ Slash commands are available in `.claude/commands/`:
 - **`/water-report`** - Get water consumption report
 - **`/water-heater-status`** - Check heat pump water heater status
 - **`/set-water-heater`** - Interactive water heater control
+- **`/get_device_status`** - Check smart lock status
+- **`/lock_doors`** - Lock one or all doors
+- **`/unlock_doors`** - Unlock one or all doors
+- **`/get_activity_logs`** - View lock activity history
 
 ## Example Usage
 
@@ -525,10 +646,14 @@ Once configured in Claude Code, you can use natural language:
 "What's my water heater temperature?"
 "Set water heater to 120 degrees"
 "Put water heater in vacation mode"
+"Is my door locked?"
+"Lock the front door"
+"Who unlocked the door today?"
 "/laundry-status"
 "/sauna-status"
 "/water-status"
 "/water-heater-status"
+"/get_device_status"
 ```
 
 ## Troubleshooting
@@ -622,6 +747,28 @@ Once configured in Claude Code, you can use natural language:
 - Some older models may not support energy monitoring
 - Wait for the water heater to collect usage data
 
+### Tedee Smart Lock Issues
+
+**"401 Unauthorized" or authentication errors**
+- Verify your TEDEE_API_KEY is correct in `.env`
+- Check that the PAK hasn't expired (max 5 years)
+- Ensure the PAK has required permissions (Device.Read, Lock.Operate, DeviceActivity.Read)
+
+**Lock not responding**
+- Verify the Tedee bridge is powered on and connected to WiFi
+- Check lock connectivity in the Tedee mobile app
+- Ensure the lock has battery charge
+
+**Cannot lock/unlock remotely**
+- The lock must be connected via Tedee bridge (not Bluetooth only)
+- Verify remote access is enabled in Tedee app settings
+- Check that your PAK has Lock.Operate permission
+
+**Operation times out**
+- Lock/unlock operations take 2-3 seconds
+- Use `get_operation_status` to verify completion
+- Rate limit: max 1000 requests/hour
+
 ### MCP Server Issues
 
 **Servers not loading in Claude Code**
@@ -650,6 +797,9 @@ Phyn uses AWS Cognito authentication with your mobile app login credentials. Tok
 ### A.O. Smith Credentials
 A.O. Smith uses JWT authentication with your iComm mobile app login credentials. Tokens are automatically refreshed by the MCP server. No manual maintenance needed.
 
+### Tedee PAK
+Tedee Personal Access Keys can last up to 5 years. Check expiration at https://portal.tedee.com/personal-access-keys and regenerate before expiration.
+
 ## Project Structure
 
 ```
@@ -662,16 +812,19 @@ Home Controller/
 ├── huum-mcp-server.js       # HUUM Sauna MCP server (Node.js)
 ├── phyn-mcp-server.js       # Phyn Water Monitor MCP server (Node.js)
 ├── aosmith-mcp-server.js    # A.O. Smith Water Heater MCP server (Node.js)
+├── tedee-mcp-server.js      # Tedee Smart Lock MCP server (Node.js)
 ├── auth.js                  # Miele OAuth helper
 ├── miele-mcp-wrapper.sh     # Miele MCP server wrapper
 ├── lg-thinq-mcp-wrapper.sh  # LG ThinQ MCP server wrapper
 ├── huum-mcp-wrapper.sh      # HUUM MCP server wrapper
 ├── phyn-mcp-wrapper.sh      # Phyn MCP server wrapper
 ├── aosmith-mcp-wrapper.sh   # A.O. Smith MCP server wrapper
+├── tedee-mcp-wrapper.sh     # Tedee MCP server wrapper
 ├── test-miele-mcp.cjs       # Miele integration test
 ├── test-lg-dryer.cjs        # LG ThinQ integration test
 ├── test-huum-sauna.cjs      # HUUM integration test
 ├── test-phyn-mcp.cjs        # Phyn integration test
+├── test-tedee-mcp.cjs       # Tedee integration test
 ├── test-aosmith-mcp.cjs     # A.O. Smith integration test
 ├── package.json             # Node.js dependencies
 ├── README.md                # This file

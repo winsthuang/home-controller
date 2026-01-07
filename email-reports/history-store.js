@@ -89,6 +89,16 @@ export function addDailyStats(data) {
     data.waterHeater?.dailyUsage || 0
   );
 
+  // Smart Locks: keep max values seen today (accumulate through the day)
+  const lockEvents = Math.max(
+    existing?.lockEvents || 0,
+    data.smartLocks?.todayLocks || 0
+  );
+  const unlockEvents = Math.max(
+    existing?.unlockEvents || 0,
+    data.smartLocks?.todayUnlocks || 0
+  );
+
   const dailyEntry = {
     date: today,
     timestamp: new Date().toISOString(),
@@ -99,7 +109,9 @@ export function addDailyStats(data) {
     ovenUsed,
     saunaUsed,
     fridgeTemp: parseFloat(data.kitchen?.refrigerator?.temperature) || null,
-    freezerTemp: parseFloat(data.kitchen?.freezer?.temperature) || null
+    freezerTemp: parseFloat(data.kitchen?.freezer?.temperature) || null,
+    lockEvents,
+    unlockEvents
   };
 
   if (existingIndex >= 0) {
@@ -218,10 +230,12 @@ export function getWeeklyStats(weeksAgo = 0) {
     energyKwh: acc.energyKwh + (s.energyKwh || 0),
     washerCycles: acc.washerCycles + (s.washerCycles || 0),
     ovenUses: acc.ovenUses + (s.ovenUsed ? 1 : 0),
-    saunaSessions: acc.saunaSessions + (s.saunaUsed ? 1 : 0)
+    saunaSessions: acc.saunaSessions + (s.saunaUsed ? 1 : 0),
+    lockEvents: acc.lockEvents + (s.lockEvents || 0),
+    unlockEvents: acc.unlockEvents + (s.unlockEvents || 0)
   }), {
     waterGallons: 0, energyKwh: 0, washerCycles: 0,
-    ovenUses: 0, saunaSessions: 0
+    ovenUses: 0, saunaSessions: 0, lockEvents: 0, unlockEvents: 0
   });
 
   return {
@@ -254,10 +268,12 @@ export function getWeeklyAverage(weeks) {
     energyKwh: acc.energyKwh + w.energyKwh,
     washerCycles: acc.washerCycles + w.washerCycles,
     ovenUses: acc.ovenUses + w.ovenUses,
-    saunaSessions: acc.saunaSessions + w.saunaSessions
+    saunaSessions: acc.saunaSessions + w.saunaSessions,
+    lockEvents: acc.lockEvents + (w.lockEvents || 0),
+    unlockEvents: acc.unlockEvents + (w.unlockEvents || 0)
   }), {
     waterGallons: 0, energyKwh: 0, washerCycles: 0,
-    ovenUses: 0, saunaSessions: 0
+    ovenUses: 0, saunaSessions: 0, lockEvents: 0, unlockEvents: 0
   });
 
   const count = weeklyData.length;
@@ -268,7 +284,9 @@ export function getWeeklyAverage(weeks) {
     energyKwh: sum.energyKwh / count,
     washerCycles: sum.washerCycles / count,
     ovenUses: sum.ovenUses / count,
-    saunaSessions: sum.saunaSessions / count
+    saunaSessions: sum.saunaSessions / count,
+    lockEvents: sum.lockEvents / count,
+    unlockEvents: sum.unlockEvents / count
   };
 }
 

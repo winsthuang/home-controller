@@ -4,13 +4,13 @@
 
 ## Project Overview
 
-This is a smart home automation system that integrates **Miele**, **LG ThinQ**, **HUUM Sauna**, **Phyn Water Monitor**, and **A.O. Smith Water Heater** appliances through MCP (Model Context Protocol) servers. Users can check status and control appliances using natural language or slash commands.
+This is a smart home automation system that integrates **Miele**, **LG ThinQ**, **HUUM Sauna**, **Phyn Water Monitor**, **A.O. Smith Water Heater**, and **Tedee Smart Locks** through MCP (Model Context Protocol) servers. Users can check status and control appliances using natural language or slash commands.
 
 **Automated Email Reports:** Daily (10pm) and weekly (Saturday 8am) email reports with usage stats, historical comparisons, and trends.
 
 ## MCP Servers
 
-Five MCP servers are configured in `.mcp.json`:
+Six MCP servers are configured in `.mcp.json`:
 
 ### 1. Miele MCP Server
 - **Command:** `./miele-mcp-wrapper.sh` → `node index.js`
@@ -57,6 +57,19 @@ Five MCP servers are configured in `.mcp.json`:
   - `set_mode` - Change operation mode (HEAT_PUMP, HYBRID, ELECTRIC, VACATION)
   - `get_energy_usage` - Get energy consumption data (lifetime kWh, daily usage)
 
+### 6. Tedee Smart Lock MCP Server
+- **Command:** `./tedee-mcp-wrapper.sh` → `node tedee-mcp-server.js`
+- **Server Name:** `tedee-smart-lock` v1.0.0
+- **Tools:**
+  - `get_devices` - Get all Tedee locks on account
+  - `get_device_status` - Get lock status by lock_id (state, battery, door)
+  - `sync_all_locks` - Sync and get current status of all locks
+  - `lock_door` - Lock a specific door
+  - `unlock_door` - Unlock a specific door
+  - `pull_spring` - Pull spring (for locks with auto-pull disabled)
+  - `get_operation_status` - Check async operation result
+  - `get_activity_log` - Get lock activity history
+
 ## How to Query MCP Servers
 
 **IMPORTANT:** MCP servers use JSON-RPC over stdio, NOT CLI arguments.
@@ -71,6 +84,7 @@ node test-miele-mcp.cjs     # Miele appliances status
 node test-huum-sauna.cjs    # HUUM sauna status
 node test-phyn-mcp.cjs      # Phyn water monitor status
 node test-aosmith-mcp.cjs   # A.O. Smith water heater status
+node test-tedee-mcp.cjs     # Tedee smart lock status
 ```
 
 The test scripts implement proper JSON-RPC protocol and output device status. Use these for quick status checks instead of trying to call MCP binaries directly.
@@ -168,6 +182,31 @@ The test scripts implement proper JSON-RPC protocol and output device status. Us
 - Same credentials as iComm mobile app
 - Modes: HEAT_PUMP (efficient), HYBRID (balanced), ELECTRIC (fast), VACATION (away)
 
+### Tedee Smart Locks
+| Device | API | Access |
+|--------|-----|--------|
+| Smart Lock | api.tedee.com/api/v1.32 | Personal Access Key (PAK) |
+
+**Status Fields (Tedee):**
+- `lockState` - Lock state: Locked (6), Unlocked (2), SemiLocked (3)
+- `doorState` - Door: Closed (1), Open (2)
+- `batteryLevel` - Battery percentage (0-100)
+- `isCharging` - Battery charging status
+- `isConnected` - Bridge connectivity
+- `stateChangeDate` - Last activity timestamp
+
+**Activity Log Fields:**
+- `event` - Event type: Lock (1), Unlock (2), Pull (3)
+- `source` - Source: App (9), Button (2), AutoLock (6), AutoUnlock (5)
+- `date` - Timestamp
+- `username` - User who performed action
+
+**Notes:**
+- Requires Tedee bridge for remote API access
+- Create PAK at: https://portal.tedee.com/personal-access-keys
+- Lock operations are async (use get_operation_status to verify)
+- Rate limit: 1000 requests/hour
+
 ## Common Operations
 
 ### Check Laundry Status
@@ -236,6 +275,19 @@ The test scripts implement proper JSON-RPC protocol and output device status. Us
 1. Call A.O. Smith `get_energy_usage` with junction_id
 2. Show: lifetime kWh, average daily usage, recent usage graph
 
+### Check Lock Status
+1. Call Tedee `sync_all_locks` to refresh all lock states
+2. Show: lock state, door state, battery level, connection status
+
+### Lock/Unlock Door
+1. Call Tedee `lock_door` or `unlock_door` with lock_id
+2. Call Tedee `get_operation_status` with operationId to verify completion
+3. Confirm operation success
+
+### View Lock History
+1. Call Tedee `get_activity_log` with lock_id and count
+2. Show: recent events with timestamps and users
+
 ## Slash Commands
 
 Available in `.claude/commands/`:
@@ -256,6 +308,10 @@ Available in `.claude/commands/`:
 - `/water-report` - Water consumption report
 - `/water-heater-status` - Heat pump water heater status
 - `/set-water-heater` - Interactive water heater control
+- `/get_device_status` - Smart lock status
+- `/lock_doors` - Lock one or all doors
+- `/unlock_doors` - Unlock one or all doors
+- `/get_activity_logs` - Lock activity history
 
 ## Quick Status Check Pattern
 
@@ -266,7 +322,8 @@ When user asks "check status" or similar:
 3. **For sauna:** Use HUUM MCP `get_sauna_status`
 4. **For water:** Use Phyn MCP `get_device_status` for Phyn Plus
 5. **For water heater:** Use A.O. Smith MCP `get_devices` or `get_device_status`
-6. **For everything:** Call all five servers and query all devices
+6. **For locks:** Use Tedee MCP `sync_all_locks`
+7. **For everything:** Call all six servers and query all devices
 
 Format output with icons:
 - 🧺 Washer
@@ -276,6 +333,7 @@ Format output with icons:
 - 🧖 Sauna
 - 💧 Water Monitor
 - 🚿 Water Heater
+- 🔐 Smart Lock
 
 ## File Structure
 
@@ -299,6 +357,9 @@ Format output with icons:
 ├── aosmith-mcp-server.js     # A.O. Smith MCP server implementation
 ├── aosmith-mcp-wrapper.sh    # A.O. Smith MCP wrapper script
 ├── test-aosmith-mcp.cjs      # A.O. Smith integration test
+├── tedee-mcp-server.js       # Tedee Smart Lock MCP server implementation
+├── tedee-mcp-wrapper.sh      # Tedee MCP wrapper script
+├── test-tedee-mcp.cjs        # Tedee integration test
 ├── email-reports/            # Automated email reporting system
 │   ├── email-report.js       # Main entry point
 │   ├── data-collector.js     # Collects data from all MCP servers
@@ -325,6 +386,7 @@ From `.env`:
 - `HUUM_USERNAME` / `HUUM_PASSWORD` - HUUM app credentials
 - `PHYN_USERNAME` / `PHYN_PASSWORD` - Phyn app credentials
 - `AOSMITH_EMAIL` / `AOSMITH_PASSWORD` - iComm app credentials
+- `TEDEE_API_KEY` - Tedee Personal Access Key (PAK)
 - `GMAIL_USER` / `GMAIL_APP_PASSWORD` - Gmail SMTP for email reports
 - `REPORT_RECIPIENT` - Email address for reports
 
@@ -344,9 +406,10 @@ From `.env`:
 
 ## Testing
 
-All five MCP servers have been tested and are confirmed working:
+All six MCP servers have been tested and are confirmed working:
 - `node test-lg-dryer.cjs` - Test LG ThinQ integration (washer + dryer)
 - `node test-miele-mcp.cjs` - Test Miele integration (oven, fridge, freezer)
 - `node test-huum-sauna.cjs` - Test HUUM sauna integration
 - `node test-phyn-mcp.cjs` - Test Phyn water monitor integration
 - `node test-aosmith-mcp.cjs` - Test A.O. Smith water heater integration
+- `node test-tedee-mcp.cjs` - Test Tedee smart lock integration

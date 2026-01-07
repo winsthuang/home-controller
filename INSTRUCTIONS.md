@@ -1,6 +1,6 @@
 # Home Controller - Simple User Guide
 
-Welcome! This guide will help you control your home appliances (Miele, LG ThinQ, HUUM Sauna, Phyn Water Monitor, and A.O. Smith Water Heater) using Claude Code. No technical expertise required!
+Welcome! This guide will help you control your home appliances (Miele, LG ThinQ, HUUM Sauna, Phyn Water Monitor, A.O. Smith Water Heater, and Tedee Smart Locks) using Claude Code. No technical expertise required!
 
 ## What Can I Do?
 
@@ -82,6 +82,12 @@ Once Claude Code is running, you can use these quick commands by typing them dir
 - `/water-heater-status` - Check water heater temperature, mode, and status
 - `/set-water-heater` - Get help changing water heater settings
 
+### Smart Lock Commands
+- `/get_device_status` - Check all smart lock status, battery, and door state
+- `/lock_doors` - Lock one or all doors
+- `/unlock_doors` - Unlock one or all doors
+- `/get_activity_logs` - View recent lock/unlock activity history
+
 ### General Commands
 - `/home-status` - See the status of ALL your appliances at once
 - `/miele-status` - Check all Miele appliances
@@ -123,6 +129,14 @@ You don't need to memorize commands! Just talk to Claude naturally:
 - "Put the water heater in heat pump mode"
 - "Is there hot water available?"
 - "Put water heater in vacation mode"
+
+### Examples for Smart Locks
+- "Is my door locked?"
+- "Lock the front door"
+- "Unlock all doors"
+- "Check my lock battery"
+- "Who unlocked the door today?"
+- "Show me lock activity"
 
 ### Examples for General Use
 - "What appliances do I have?"
@@ -172,6 +186,19 @@ When you check water heater status, you'll see:
 - **Hot Water Status:** Availability level (High, Medium, Low)
 - **Online:** Device connectivity status
 
+### Smart Lock Status
+When you check lock status, you'll see:
+- **Lock State:** Locked, Unlocked, or Semi-locked
+- **Door State:** Open or Closed
+- **Battery:** Battery percentage (0-100%)
+- **Connected:** Bridge connection status
+
+### Lock Activity
+When you view lock activity, you'll see:
+- **Event Type:** Lock, Unlock, or Pull Spring
+- **Time:** When the event occurred
+- **User:** Who performed the action (if available)
+
 ## Troubleshooting
 
 ### "Command not found: claude"
@@ -219,6 +246,17 @@ Your Miele access token has expired (they last 30 days). To refresh:
 - Verify the water heater is online in the iComm mobile app
 - Ensure your iComm credentials are correct in the `.env` file
 - Try logging out and back into the iComm app
+
+### Smart Lock Not Responding
+- Check that the Tedee Bridge is powered and connected to WiFi
+- Verify the lock shows as connected in the Tedee app
+- Ensure your Tedee API key is correct in the `.env` file
+- Check lock battery level - low battery can cause connectivity issues
+
+### "Lock operation pending"
+- Lock operations are asynchronous - wait a few seconds
+- If the operation doesn't complete, check the lock's Bluetooth connection to the bridge
+- Make sure no one is manually operating the lock
 
 ## Common Scenarios
 
@@ -273,6 +311,18 @@ Your Miele access token has expired (they last 30 days). To refresh:
 3. If hot water is low, say: "Set water heater to electric mode" for fastest recovery
 4. Once guests leave, switch back: "Set water heater to heat pump mode"
 
+### Scenario 10: Check if All Doors Are Locked Before Bed
+1. Start Claude Code
+2. Type: `/get_device_status` or ask "Are all my doors locked?"
+3. If any door is unlocked, say: "Lock all doors"
+4. Claude will confirm when all doors are secured
+
+### Scenario 11: View Who's Been Coming and Going
+1. Start Claude Code
+2. Type: `/get_activity_logs`
+3. You'll see recent lock/unlock events with timestamps
+4. Great for checking if packages were delivered or kids got home
+
 ## Tips for Best Results
 
 1. **Be Specific:** Instead of "check that", say "check the washer" or "check the oven"
@@ -304,12 +354,15 @@ Based on your setup, you should have access to:
 ### A.O. Smith Water Heater
 - Heat Pump Water Heater (iComm-enabled)
 
+### Tedee Smart Locks
+- Smart locks (connected via Tedee Bridge)
+
 To see your complete list, just ask: "What appliances do I have?" or type `/home-status`
 
 ## Security & Privacy
 
 - Your credentials are stored locally on your computer (in the `.env` file)
-- Nothing is sent to the cloud except standard API calls to Miele, LG, HUUM, Phyn, and A.O. Smith
+- Nothing is sent to the cloud except standard API calls to Miele, LG, HUUM, Phyn, A.O. Smith, and Tedee
 - Your tokens are never shared with anyone
 - The `.env` file is excluded from git to prevent accidental sharing
 
@@ -319,6 +372,7 @@ To see your complete list, just ask: "What appliances do I have?" or type `/home
 - Visit the Miele Developer Portal: https://developer.miele.com/
 - Visit the LG ThinQ Developer Portal: https://thinq.developer.lge.com
 - Check the HUUM support: https://huumsauna.com/
+- Visit the Tedee Portal: https://portal.tedee.com/
 - Contact support for your specific appliance brand if devices aren't responding
 
 ## Quick Reference Card
@@ -334,6 +388,10 @@ QUICK COMMANDS:
 /water-report         → Water consumption report
 /water-heater-status  → Water heater temp & mode
 /set-water-heater     → Change water heater settings
+/get_device_status    → Smart lock status
+/lock_doors           → Lock doors
+/unlock_doors         → Unlock doors
+/get_activity_logs    → Lock/unlock history
 /home-status          → All appliances
 /fridge-status        → Fridge & freezer temps
 /oven-status          → Oven status
@@ -351,6 +409,8 @@ NATURAL LANGUAGE EXAMPLES:
 "How much water did I use this month?"
 "What's my water heater temperature?"
 "Set water heater to 120 degrees"
+"Is my door locked?"
+"Lock all doors"
 "Start the washer"
 "Show me everything"
 
