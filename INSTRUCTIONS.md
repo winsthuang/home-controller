@@ -8,6 +8,7 @@ You can control and monitor your home appliances by talking to Claude Code in na
 - "What's the status of my washer?"
 - "Is my laundry done?"
 - "Check my refrigerator temperature"
+- "Set the freezer to -18 degrees"
 - "Start the dryer"
 - "Heat the sauna to 80 degrees"
 - "What's the sauna temperature?"
@@ -66,6 +67,7 @@ Once Claude Code is running, you can use these quick commands by typing them dir
 ### Kitchen Commands
 - `/kitchen-status` - Check all Miele kitchen appliances (oven, fridge, etc.)
 - `/fridge-status` - Check refrigerator and freezer temperatures
+- `/set-fridge-temp` - Set refrigerator or freezer temperature
 - `/freezer-check` - Quick freezer check (especially for alerts)
 - `/oven-status` - Quick check on the oven
 
@@ -105,6 +107,8 @@ You don't need to memorize commands! Just talk to Claude naturally:
 
 ### Examples for Kitchen
 - "What's the temperature in my fridge?"
+- "Set the freezer to -18 degrees"
+- "Make the fridge a bit colder"
 - "Is the oven on?"
 - "Check my freezer"
 - "Show me all my Miele appliances"
@@ -271,6 +275,12 @@ Your Miele access token has expired (they last 30 days). To refresh:
 2. Ask: "What's my oven doing?" or use `/oven-status`
 3. Check periodically or ask "Are there any alerts?"
 
+### Scenario 2b: Adjust Fridge/Freezer Temperature
+1. Start Claude Code
+2. Ask: "Set the freezer to -17 degrees" or use `/set-fridge-temp`
+3. Claude will confirm the temperature change
+4. Valid ranges: Fridge 1-9°C, Freezer -24 to -16°C
+
 ### Scenario 3: Morning Appliance Check
 1. Start Claude Code
 2. Type: `/home-status`
@@ -394,6 +404,7 @@ QUICK COMMANDS:
 /get_activity_logs    → Lock/unlock history
 /home-status          → All appliances
 /fridge-status        → Fridge & freezer temps
+/set-fridge-temp      → Set fridge/freezer temperature
 /oven-status          → Oven status
 /start-sauna          → Start sauna heating
 /stop-sauna           → Turn off sauna
@@ -402,6 +413,7 @@ QUICK COMMANDS:
 NATURAL LANGUAGE EXAMPLES:
 "Is my laundry done?"
 "What's my fridge temperature?"
+"Set the freezer to -18 degrees"
 "Check the oven"
 "Heat the sauna to 80 degrees"
 "What's the sauna temperature?"

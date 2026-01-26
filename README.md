@@ -8,6 +8,7 @@ A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, Ph
 - Get list of all connected Miele devices
 - Get detailed status of any device (oven, refrigerator, freezer, etc.)
 - Control devices (start, stop, pause, power on/off)
+- Set refrigerator/freezer temperatures with zone support
 - Real-time device monitoring
 
 ### LG ThinQ Integration (Official Python MCP Server)
@@ -57,6 +58,7 @@ A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, Ph
 ### Slash Commands
 - `/laundry-status` - Quick check on washers and dryers
 - `/kitchen-status` - Check all Miele kitchen appliances
+- `/set-fridge-temp` - Set refrigerator or freezer temperature
 - `/sauna-status` - Check HUUM sauna status
 - `/home-status` - Complete overview of all devices
 - `/start-washer` - Interactive washer control
@@ -428,6 +430,18 @@ Perform an action on a device.
   - `deviceId` (string)
   - `action` (string): one of "start", "stop", "pause", "powerOn", "powerOff"
 
+#### `set_temperature`
+Set target temperature for a refrigerator or freezer.
+- Parameters:
+  - `deviceId` (string)
+  - `temperature` (number): Target temperature in Celsius
+  - `zone` (number, optional): Temperature zone (default: 1)
+
+#### `get_temperature_settings`
+Get current temperature settings and valid ranges for a cooling appliance.
+- Parameters: `deviceId` (string)
+- Returns: current temps, target temps, and valid ranges per zone
+
 ### LG ThinQ MCP Server
 
 The official LG ThinQ MCP server provides:
@@ -612,6 +626,7 @@ Slash commands are available in `.claude/commands/`:
 
 - **`/laundry-status`** - Quick status check for washers/dryers
 - **`/kitchen-status`** - Check all Miele kitchen appliances
+- **`/set-fridge-temp`** - Set refrigerator or freezer temperature
 - **`/sauna-status`** - Check HUUM sauna temperature and status
 - **`/home-status`** - Dashboard view of all appliances
 - **`/start-washer`** - Interactive washer program selection
@@ -634,7 +649,8 @@ Once configured in Claude Code, you can use natural language:
 
 ```
 "What appliances do I have?"
-"Check my refrigerator temperature"
+""Check my refrigerator temperature"
+"Set the freezer to -18 degrees""
 "Is my laundry done?"
 "Start the washer on delicate cycle"
 "Heat the sauna to 80 degrees"
@@ -844,7 +860,8 @@ Home Controller/
         ├── water-status.md
         ├── water-report.md
         ├── water-heater-status.md
-        └── set-water-heater.md
+        ├── set-water-heater.md
+        └── set-fridge-temp.md
 ```
 
 ## Security Notes

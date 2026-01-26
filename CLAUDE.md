@@ -19,6 +19,8 @@ Six MCP servers are configured in `.mcp.json`:
   - `get_devices` - Get all Miele devices
   - `get_device_status` - Get device status by deviceId
   - `device_action` - Control device (start, stop, pause, powerOn, powerOff)
+  - `set_temperature` - Set target temperature for fridge/freezer (deviceId, temperature, zone)
+  - `get_temperature_settings` - Get current temps and valid ranges per zone
 
 ### 2. LG ThinQ MCP Server
 - **Command:** `./lg-thinq-mcp-wrapper.sh` → `~/.local/bin/thinqconnect-mcp`
@@ -230,6 +232,16 @@ The test scripts implement proper JSON-RPC protocol and output device status. Us
 - Call Miele `get_device_status` for each
 - Show: current temp, target temp, status, door/failure signals
 
+### Set Fridge/Freezer Temperature
+1. Call Miele `get_temperature_settings` with deviceId to see current temps and valid ranges
+2. Call Miele `set_temperature` with deviceId, temperature (°C), and optional zone
+3. Confirm temperature change was applied
+
+**Temperature Ranges:**
+- Refrigerator Zone 1 (Main): 1-9°C
+- Refrigerator Zone 2 (PerfectFresh): 0-3°C
+- Freezer Zone 1: -24 to -16°C
+
 ### Check Sauna Status
 1. Call HUUM `get_sauna_status`
 2. Show: current temp, target temp, heater status, door state, light
@@ -296,6 +308,7 @@ Available in `.claude/commands/`:
 - `/kitchen-status` - All Miele kitchen appliances
 - `/sauna-status` - Sauna temperature and status
 - `/fridge-status` - Refrigerator and freezer temps
+- `/set-fridge-temp` - Set refrigerator or freezer temperature
 - `/freezer-check` - Quick freezer check
 - `/oven-status` - Quick oven check
 - `/miele-status` - All Miele appliances
