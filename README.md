@@ -1,6 +1,6 @@
 # Home Controller - Smart Home MCP Integration
 
-A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, Phyn Water Monitor, A.O. Smith Water Heater, and Tedee Smart Lock appliances through Claude Code using the Model Context Protocol (MCP).
+A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, Phyn Water Monitor, A.O. Smith Water Heater, Tedee Smart Lock, and Tesla Powerwall/Solar appliances through Claude Code using the Model Context Protocol (MCP).
 
 ## Features
 
@@ -47,10 +47,21 @@ A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, Ph
 - Support for multiple locks
 - Requires Tedee bridge for remote access
 
+### Tesla Powerwall/Solar Integration (Custom Node.js MCP Server)
+- Monitor Powerwall battery level and status
+- Real-time solar production data
+- Grid import/export tracking
+- Home energy consumption monitoring
+- Self-powered percentage calculation
+- Historical energy data (daily/weekly/monthly/yearly)
+- Support for multiple energy sites
+- OAuth 2.0 with PKCE authentication
+
 ### Automated Email Reports
 - **Daily reports** at 10pm with usage recap
 - **Weekly reports** on Saturday 8am with trends
-- Tracks: water usage, laundry cycles, sauna sessions, oven uses
+- Tracks: solar production, battery status, water usage, energy costs, laundry cycles, sauna sessions, oven uses
+- Solar & Battery section with production value, grid import/export, self-powered %
 - Historical comparisons: vs yesterday, 7-day avg, 4-week avg, 12-week avg
 - 12-week sparkline trends in weekly reports
 - Gmail SMTP with macOS launchd scheduling
@@ -74,6 +85,7 @@ A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, Ph
 - `/lock_doors` - Lock one or all doors
 - `/unlock_doors` - Unlock one or all doors
 - `/get_activity_logs` - View lock activity history
+- `/solar-status` - Check Powerwall battery and solar production
 
 ## Prerequisites
 
@@ -107,6 +119,13 @@ A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, Ph
    - Tedee bridge (required for remote API access)
    - Tedee mobile app account
    - Personal Access Key (PAK) from Tedee Portal
+   - Node.js v18+ installed
+
+7. **For Tesla Powerwall/Solar:**
+   - Tesla Powerwall and/or Solar installation
+   - Tesla account (same as Tesla app)
+   - Tesla Developer Portal application
+   - Domain with HTTPS for hosting public key (e.g., GitHub Pages)
    - Node.js v18+ installed
 
 ## Setup
@@ -289,6 +308,67 @@ Your Tedee lock must be connected via a Tedee bridge for remote API access. If y
 The Tedee MCP server uses the same Node.js dependencies:
 ```bash
 npm install
+```
+
+### Tesla Powerwall/Solar Setup
+
+#### Step 1: Register as Tesla Developer
+
+1. Go to [Tesla Developer Portal](https://developer.tesla.com/)
+2. Sign in with your Tesla account (same as Tesla app)
+3. Accept the developer terms of service
+
+#### Step 2: Create an Application
+
+1. Click "Create Application"
+2. Fill in required fields:
+   - **Name:** "Home Controller" (or any name)
+   - **Description:** "Personal home energy monitoring"
+   - **Purpose:** Select "Personal Use"
+   - **Allowed Origins:** `http://localhost:3000`
+   - **Allowed Redirect URIs:** `http://localhost:3000/callback`
+3. Submit and wait for approval (usually instant for personal use)
+4. Copy `Client ID` and `Client Secret`
+
+#### Step 3: Host Public Key (Required by Tesla)
+
+Tesla Fleet API requires a public key hosted at a specific URL. Use GitHub Pages:
+
+1. Create a GitHub repo named `yourusername.github.io`
+2. Enable GitHub Pages in repo settings
+3. Generate key pair: `openssl ecparam -name prime256v1 -genkey -noout -out tesla-private-key.pem`
+4. Extract public key: `openssl ec -in tesla-private-key.pem -pubout -out tesla-public-key.pem`
+5. Create directory structure: `.well-known/appspecific/com.tesla.3p.public-key.pem`
+6. Push to GitHub and verify key is accessible at `https://yourusername.github.io/.well-known/appspecific/com.tesla.3p.public-key.pem`
+
+#### Step 4: Configure Environment
+
+1. Edit `.env` and add your credentials:
+   ```env
+   TESLA_CLIENT_ID=your_client_id_here
+   TESLA_CLIENT_SECRET=your_client_secret_here
+   ```
+
+#### Step 5: Generate Tokens
+
+Run the setup script:
+```bash
+node tesla-setup.js
+```
+
+This will:
+1. Open browser for Tesla login
+2. Authorize the application
+3. Register with Tesla Fleet API
+4. Auto-discover your energy site ID
+5. Save tokens to `.env` and `.tesla-tokens.json`
+
+**Note:** Refresh tokens expire after ~90 days. Re-run `node tesla-setup.js` before expiry.
+
+#### Step 6: Test Integration
+
+```bash
+node test-tesla-mcp.cjs
 ```
 
 ### Email Reports Setup

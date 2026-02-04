@@ -1,6 +1,6 @@
 # Home Controller - Simple User Guide
 
-Welcome! This guide will help you control your home appliances (Miele, LG ThinQ, HUUM Sauna, Phyn Water Monitor, A.O. Smith Water Heater, and Tedee Smart Locks) using Claude Code. No technical expertise required!
+Welcome! This guide will help you control your home appliances (Miele, LG ThinQ, HUUM Sauna, Phyn Water Monitor, A.O. Smith Water Heater, Tedee Smart Locks, and Tesla Powerwall/Solar) using Claude Code. No technical expertise required!
 
 ## What Can I Do?
 
@@ -16,8 +16,11 @@ You can control and monitor your home appliances by talking to Claude Code in na
 - "How much water did I use this month?"
 - "What's my water heater temperature?"
 - "Set water heater to 120 degrees"
+- "What's my battery level?"
+- "How much solar did I produce today?"
+- "Am I exporting to the grid?"
 
-You can also use quick slash commands like `/laundry-status`, `/sauna-status`, `/water-status`, or `/water-heater-status` to get instant updates.
+You can also use quick slash commands like `/laundry-status`, `/sauna-status`, `/water-status`, `/water-heater-status`, or `/solar-status` to get instant updates.
 
 ## Getting Started from Scratch
 
@@ -90,6 +93,9 @@ Once Claude Code is running, you can use these quick commands by typing them dir
 - `/unlock_doors` - Unlock one or all doors
 - `/get_activity_logs` - View recent lock/unlock activity history
 
+### Solar & Battery Commands
+- `/solar-status` - Check Powerwall battery level and solar production
+
 ### General Commands
 - `/home-status` - See the status of ALL your appliances at once
 - `/miele-status` - Check all Miele appliances
@@ -141,6 +147,14 @@ You don't need to memorize commands! Just talk to Claude naturally:
 - "Check my lock battery"
 - "Who unlocked the door today?"
 - "Show me lock activity"
+
+### Examples for Solar & Battery
+- "What's my Powerwall battery level?"
+- "How much solar am I producing?"
+- "Am I exporting to the grid?"
+- "What's my home energy consumption?"
+- "What percent self-powered am I?"
+- "Show me my solar status"
 
 ### Examples for General Use
 - "What appliances do I have?"
@@ -202,6 +216,15 @@ When you view lock activity, you'll see:
 - **Event Type:** Lock, Unlock, or Pull Spring
 - **Time:** When the event occurred
 - **User:** Who performed the action (if available)
+
+### Solar & Battery Status
+When you check solar status, you'll see:
+- **Battery Level:** Powerwall charge percentage (0-100%)
+- **Battery Status:** Charging, Discharging, or Standby
+- **Solar Production:** Current solar power in kW
+- **Home Consumption:** Current home power usage in kW
+- **Grid Power:** Importing from or exporting to grid
+- **Self-Powered:** Percentage of energy from solar/battery
 
 ## Troubleshooting
 
@@ -367,12 +390,16 @@ Based on your setup, you should have access to:
 ### Tedee Smart Locks
 - Smart locks (connected via Tedee Bridge)
 
+### Tesla Energy
+- Powerwall battery
+- Solar panels
+
 To see your complete list, just ask: "What appliances do I have?" or type `/home-status`
 
 ## Security & Privacy
 
 - Your credentials are stored locally on your computer (in the `.env` file)
-- Nothing is sent to the cloud except standard API calls to Miele, LG, HUUM, Phyn, A.O. Smith, and Tedee
+- Nothing is sent to the cloud except standard API calls to Miele, LG, HUUM, Phyn, A.O. Smith, Tedee, and Tesla
 - Your tokens are never shared with anyone
 - The `.env` file is excluded from git to prevent accidental sharing
 
@@ -383,6 +410,7 @@ To see your complete list, just ask: "What appliances do I have?" or type `/home
 - Visit the LG ThinQ Developer Portal: https://thinq.developer.lge.com
 - Check the HUUM support: https://huumsauna.com/
 - Visit the Tedee Portal: https://portal.tedee.com/
+- Visit the Tesla Developer Portal: https://developer.tesla.com/
 - Contact support for your specific appliance brand if devices aren't responding
 
 ## Quick Reference Card
@@ -402,6 +430,7 @@ QUICK COMMANDS:
 /lock_doors           → Lock doors
 /unlock_doors         → Unlock doors
 /get_activity_logs    → Lock/unlock history
+/solar-status         → Powerwall & solar status
 /home-status          → All appliances
 /fridge-status        → Fridge & freezer temps
 /set-fridge-temp      → Set fridge/freezer temperature
@@ -423,6 +452,8 @@ NATURAL LANGUAGE EXAMPLES:
 "Set water heater to 120 degrees"
 "Is my door locked?"
 "Lock all doors"
+"What's my battery level?"
+"How much solar today?"
 "Start the washer"
 "Show me everything"
 
