@@ -111,7 +111,53 @@ export function addDailyStats(data) {
     fridgeTemp: parseFloat(data.kitchen?.refrigerator?.temperature) || null,
     freezerTemp: parseFloat(data.kitchen?.freezer?.temperature) || null,
     lockEvents,
-    unlockEvents
+    unlockEvents,
+
+    // NEW FIELDS for enhanced tracking:
+
+    // Water system health
+    waterPressure: data.water?.pressure || null,
+    waterTemperature: data.water?.temperature || null,
+    waterFlowRate: data.water?.flow || null,
+    waterSignalStrength: data.water?.signalStrength || null,
+
+    // Water heater
+    waterHeaterMode: data.waterHeater?.operationMode || null,
+    waterHeaterSetpoint: data.waterHeater?.temperatureSetpoint || null,
+    waterHeaterOnline: data.waterHeater?.isOnline || false,
+
+    // Smart locks (detailed battery tracking)
+    lockBatteryLevels: (data.smartLocks?.locks || []).map(l => ({
+      id: l.id,
+      name: l.name,
+      battery: l.batteryLevel,
+      charging: l.isCharging,
+      connected: l.isConnected
+    })),
+
+    // Lock activity sources
+    lockActivitySources: data.smartLocks?.activityBreakdown?.locksBySource || null,
+    unlockActivitySources: data.smartLocks?.activityBreakdown?.unlocksBySource || null,
+
+    // Tesla Solar & Battery
+    solarProduction: Math.max(
+      existing?.solarProduction || 0,
+      data.tesla?.solarProduction || 0
+    ),
+    batteryLevel: data.tesla?.batteryLevel || null,
+    gridImport: Math.max(
+      existing?.gridImport || 0,
+      data.tesla?.gridImport || 0
+    ),
+    gridExport: Math.max(
+      existing?.gridExport || 0,
+      data.tesla?.gridExport || 0
+    ),
+    homeConsumption: Math.max(
+      existing?.homeConsumption || 0,
+      data.tesla?.homeConsumption || 0
+    ),
+    selfPoweredPercentage: data.tesla?.historySelfPowered || null
   };
 
   if (existingIndex >= 0) {
@@ -172,12 +218,20 @@ export function getAverageForDays(days) {
     fridgeTemp: acc.fridgeTemp + (s.fridgeTemp || 0),
     freezerTemp: acc.freezerTemp + (s.freezerTemp || 0),
     fridgeTempCount: acc.fridgeTempCount + (s.fridgeTemp ? 1 : 0),
-    freezerTempCount: acc.freezerTempCount + (s.freezerTemp ? 1 : 0)
+    freezerTempCount: acc.freezerTempCount + (s.freezerTemp ? 1 : 0),
+    // Solar/battery fields
+    solarProduction: acc.solarProduction + (s.solarProduction || 0),
+    gridImport: acc.gridImport + (s.gridImport || 0),
+    gridExport: acc.gridExport + (s.gridExport || 0),
+    homeConsumption: acc.homeConsumption + (s.homeConsumption || 0),
+    solarCount: acc.solarCount + (s.solarProduction > 0 ? 1 : 0)
   }), {
     waterGallons: 0, energyKwh: 0, washerCycles: 0,
     ovenUses: 0, saunaSessions: 0,
     fridgeTemp: 0, freezerTemp: 0,
-    fridgeTempCount: 0, freezerTempCount: 0
+    fridgeTempCount: 0, freezerTempCount: 0,
+    solarProduction: 0, gridImport: 0, gridExport: 0,
+    homeConsumption: 0, solarCount: 0
   });
 
   const count = recentStats.length;
@@ -190,7 +244,12 @@ export function getAverageForDays(days) {
     ovenUses: sum.ovenUses / count,
     saunaSessions: sum.saunaSessions / count,
     fridgeTemp: sum.fridgeTempCount > 0 ? sum.fridgeTemp / sum.fridgeTempCount : null,
-    freezerTemp: sum.freezerTempCount > 0 ? sum.freezerTemp / sum.freezerTempCount : null
+    freezerTemp: sum.freezerTempCount > 0 ? sum.freezerTemp / sum.freezerTempCount : null,
+    // Solar averages
+    solarProduction: sum.solarCount > 0 ? sum.solarProduction / sum.solarCount : 0,
+    gridImport: sum.solarCount > 0 ? sum.gridImport / sum.solarCount : 0,
+    gridExport: sum.solarCount > 0 ? sum.gridExport / sum.solarCount : 0,
+    homeConsumption: sum.solarCount > 0 ? sum.homeConsumption / sum.solarCount : 0
   };
 }
 
@@ -232,10 +291,16 @@ export function getWeeklyStats(weeksAgo = 0) {
     ovenUses: acc.ovenUses + (s.ovenUsed ? 1 : 0),
     saunaSessions: acc.saunaSessions + (s.saunaUsed ? 1 : 0),
     lockEvents: acc.lockEvents + (s.lockEvents || 0),
-    unlockEvents: acc.unlockEvents + (s.unlockEvents || 0)
+    unlockEvents: acc.unlockEvents + (s.unlockEvents || 0),
+    // Solar/battery fields
+    solarProduction: acc.solarProduction + (s.solarProduction || 0),
+    gridImport: acc.gridImport + (s.gridImport || 0),
+    gridExport: acc.gridExport + (s.gridExport || 0),
+    homeConsumption: acc.homeConsumption + (s.homeConsumption || 0)
   }), {
     waterGallons: 0, energyKwh: 0, washerCycles: 0,
-    ovenUses: 0, saunaSessions: 0, lockEvents: 0, unlockEvents: 0
+    ovenUses: 0, saunaSessions: 0, lockEvents: 0, unlockEvents: 0,
+    solarProduction: 0, gridImport: 0, gridExport: 0, homeConsumption: 0
   });
 
   return {
@@ -270,10 +335,16 @@ export function getWeeklyAverage(weeks) {
     ovenUses: acc.ovenUses + w.ovenUses,
     saunaSessions: acc.saunaSessions + w.saunaSessions,
     lockEvents: acc.lockEvents + (w.lockEvents || 0),
-    unlockEvents: acc.unlockEvents + (w.unlockEvents || 0)
+    unlockEvents: acc.unlockEvents + (w.unlockEvents || 0),
+    // Solar/battery fields
+    solarProduction: acc.solarProduction + (w.solarProduction || 0),
+    gridImport: acc.gridImport + (w.gridImport || 0),
+    gridExport: acc.gridExport + (w.gridExport || 0),
+    homeConsumption: acc.homeConsumption + (w.homeConsumption || 0)
   }), {
     waterGallons: 0, energyKwh: 0, washerCycles: 0,
-    ovenUses: 0, saunaSessions: 0, lockEvents: 0, unlockEvents: 0
+    ovenUses: 0, saunaSessions: 0, lockEvents: 0, unlockEvents: 0,
+    solarProduction: 0, gridImport: 0, gridExport: 0, homeConsumption: 0
   });
 
   const count = weeklyData.length;
@@ -286,7 +357,11 @@ export function getWeeklyAverage(weeks) {
     ovenUses: sum.ovenUses / count,
     saunaSessions: sum.saunaSessions / count,
     lockEvents: sum.lockEvents / count,
-    unlockEvents: sum.unlockEvents / count
+    unlockEvents: sum.unlockEvents / count,
+    solarProduction: sum.solarProduction / count,
+    gridImport: sum.gridImport / count,
+    gridExport: sum.gridExport / count,
+    homeConsumption: sum.homeConsumption / count
   };
 }
 
@@ -373,4 +448,32 @@ export function formatChange(current, previous, unit = '') {
   const diffStr = diff >= 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1);
 
   return `${arrow} ${sign}${absPct}% (${diffStr}${unit})`;
+}
+
+/**
+ * Calculate battery discharge rate from historical data
+ * @param {string} lockId - Lock device ID
+ * @param {Object} history - History object with dailyStats array
+ * @returns {number} - Discharge rate in % per week
+ */
+export function calculateBatteryDischargeRate(lockId, history) {
+  // Get battery readings from past 4 weeks
+  const fourWeeksAgo = new Date(Date.now() - 28 * 86400000);
+  const recentHistory = history.dailyStats.filter(day =>
+    new Date(day.date) >= fourWeeksAgo &&
+    day.lockBatteryLevels?.some(l => l.id === lockId)
+  );
+
+  if (recentHistory.length < 2) return 5; // Default estimate
+
+  const oldest = recentHistory[0].lockBatteryLevels.find(l => l.id === lockId);
+  const newest = recentHistory[recentHistory.length - 1].lockBatteryLevels.find(l => l.id === lockId);
+
+  if (!oldest || !newest) return 5;
+
+  const batteryDrop = oldest.battery - newest.battery;
+  const daysElapsed = recentHistory.length;
+  const ratePerWeek = (batteryDrop / daysElapsed) * 7;
+
+  return Math.max(ratePerWeek, 1); // At least 1% per week
 }

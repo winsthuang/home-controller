@@ -175,7 +175,10 @@ async function login() {
 // Ensure we have a valid token
 async function ensureAuthenticated() {
   if (!accessToken || Date.now() >= tokenExpiration) {
+    const expiresAt = new Date(tokenExpiration).toISOString();
+    console.error(`[AO Smith MCP] Token ${!accessToken ? 'missing' : 'expired'}, refreshing... ${accessToken ? `(expired at: ${expiresAt})` : ''}`);
     await login();
+    console.error('[AO Smith MCP] Token refreshed successfully');
   }
 }
 

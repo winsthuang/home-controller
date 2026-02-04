@@ -5,6 +5,12 @@ node_modules/
 .env
 .env.local
 .env.*.local
+.tesla-tokens.json
+
+# Tesla API keys (NEVER commit private keys)
+tesla-private-key.pem
+tesla-public-key.pem
+tesla-github-pages/
 
 # MCP configuration (contains user-specific paths)
 .mcp.json
@@ -52,6 +58,7 @@ venv/
 .claude/todos/
 .claude/history.jsonl
 .claude/settings.local.json
+tasks/
 
 # IDE
 .vscode/

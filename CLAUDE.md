@@ -4,13 +4,13 @@
 
 ## Project Overview
 
-This is a smart home automation system that integrates **Miele**, **LG ThinQ**, **HUUM Sauna**, **Phyn Water Monitor**, **A.O. Smith Water Heater**, and **Tedee Smart Locks** through MCP (Model Context Protocol) servers. Users can check status and control appliances using natural language or slash commands.
+This is a smart home automation system that integrates **Miele**, **LG ThinQ**, **HUUM Sauna**, **Phyn Water Monitor**, **A.O. Smith Water Heater**, **Tedee Smart Locks**, and **Tesla Powerwall/Solar** through MCP (Model Context Protocol) servers. Users can check status and control appliances using natural language or slash commands.
 
 **Automated Email Reports:** Daily (10pm) and weekly (Saturday 8am) email reports with usage stats, historical comparisons, and trends.
 
 ## MCP Servers
 
-Six MCP servers are configured in `.mcp.json`:
+Seven MCP servers are configured in `.mcp.json`:
 
 ### 1. Miele MCP Server
 - **Command:** `./miele-mcp-wrapper.sh` → `node index.js`
@@ -72,6 +72,14 @@ Six MCP servers are configured in `.mcp.json`:
   - `get_operation_status` - Check async operation result
   - `get_activity_log` - Get lock activity history
 
+### 7. Tesla Energy MCP Server
+- **Command:** `./tesla-mcp-wrapper.sh` → `node tesla-mcp-server.js`
+- **Server Name:** `tesla-energy` v1.0.0
+- **Tools:**
+  - `get_energy_sites` - Get all Tesla energy products (Powerwall, Solar)
+  - `get_live_status` - Get real-time power flow and battery status
+  - `get_energy_history` - Get historical energy data (day/week/month/year)
+
 ## How to Query MCP Servers
 
 **IMPORTANT:** MCP servers use JSON-RPC over stdio, NOT CLI arguments.
@@ -87,6 +95,7 @@ node test-huum-sauna.cjs    # HUUM sauna status
 node test-phyn-mcp.cjs      # Phyn water monitor status
 node test-aosmith-mcp.cjs   # A.O. Smith water heater status
 node test-tedee-mcp.cjs     # Tedee smart lock status
+node test-tesla-mcp.cjs     # Tesla Powerwall/Solar status
 ```
 
 The test scripts implement proper JSON-RPC protocol and output device status. Use these for quick status checks instead of trying to call MCP binaries directly.
@@ -209,6 +218,36 @@ The test scripts implement proper JSON-RPC protocol and output device status. Us
 - Lock operations are async (use get_operation_status to verify)
 - Rate limit: 1000 requests/hour
 
+### Tesla Powerwall/Solar
+| Device | API | Access |
+|--------|-----|--------|
+| Powerwall + Solar | fleet-api.prd.na.vn.cloud.tesla.com | OAuth 2.0 with PKCE |
+
+**Status Fields (Tesla Live):**
+- `battery.level` - Battery percentage (0-100)
+- `battery.power` - Battery power in Watts (negative = discharging)
+- `battery.status` - "charging", "discharging", or "standby"
+- `power.solar` - Solar generation in Watts
+- `power.grid` - Grid power in Watts (negative = exporting)
+- `power.home` - Home consumption in Watts
+- `grid.connected` - Grid connectivity status
+- `metrics.self_powered_percentage` - Real-time self-powered %
+- `backup_reserve` - Backup reserve percentage
+- `storm_mode_active` - Storm watch status
+
+**Energy History Fields:**
+- `totals.solar_production` - Total kWh generated
+- `totals.grid_import` - Total kWh imported from grid
+- `totals.grid_export` - Total kWh exported to grid
+- `totals.home_consumption` - Total kWh consumed
+- `totals.self_powered_percentage` - Period self-powered %
+
+**Notes:**
+- Uses Tesla Fleet API with OAuth 2.0 + PKCE
+- Refresh tokens expire after ~90 days
+- Run `node tesla-setup.js` for initial authorization
+- Read-only access (energy_device_data scope)
+
 ## Common Operations
 
 ### Check Laundry Status
@@ -300,6 +339,14 @@ The test scripts implement proper JSON-RPC protocol and output device status. Us
 1. Call Tedee `get_activity_log` with lock_id and count
 2. Show: recent events with timestamps and users
 
+### Check Solar/Battery Status
+1. Call Tesla `get_live_status` (auto-discovers site_id)
+2. Show: solar power, battery level/status, grid import/export, self-powered %
+
+### Get Solar Energy History
+1. Call Tesla `get_energy_history` with period ("day", "week", "month", "year")
+2. Show: solar production, grid import/export, home consumption, self-powered %
+
 ## Slash Commands
 
 Available in `.claude/commands/`:
@@ -325,6 +372,7 @@ Available in `.claude/commands/`:
 - `/lock_doors` - Lock one or all doors
 - `/unlock_doors` - Unlock one or all doors
 - `/get_activity_logs` - Lock activity history
+- `/solar-status` - Solar production and battery status
 
 ## Quick Status Check Pattern
 
@@ -336,7 +384,8 @@ When user asks "check status" or similar:
 4. **For water:** Use Phyn MCP `get_device_status` for Phyn Plus
 5. **For water heater:** Use A.O. Smith MCP `get_devices` or `get_device_status`
 6. **For locks:** Use Tedee MCP `sync_all_locks`
-7. **For everything:** Call all six servers and query all devices
+7. **For solar/battery:** Use Tesla MCP `get_live_status`
+8. **For everything:** Call all seven servers and query all devices
 
 Format output with icons:
 - 🧺 Washer
@@ -347,6 +396,7 @@ Format output with icons:
 - 💧 Water Monitor
 - 🚿 Water Heater
 - 🔐 Smart Lock
+- ☀️ Solar/Powerwall
 
 ## File Structure
 
@@ -373,6 +423,11 @@ Format output with icons:
 ├── tedee-mcp-server.js       # Tedee Smart Lock MCP server implementation
 ├── tedee-mcp-wrapper.sh      # Tedee MCP wrapper script
 ├── test-tedee-mcp.cjs        # Tedee integration test
+├── tesla-mcp-server.js       # Tesla Energy MCP server implementation
+├── tesla-mcp-wrapper.sh      # Tesla MCP wrapper script
+├── tesla-setup.js            # Tesla OAuth setup script
+├── test-tesla-mcp.cjs        # Tesla integration test
+├── .tesla-tokens.json        # Tesla token cache (gitignored)
 ├── email-reports/            # Automated email reporting system
 │   ├── email-report.js       # Main entry point
 │   ├── data-collector.js     # Collects data from all MCP servers
@@ -400,6 +455,12 @@ From `.env`:
 - `PHYN_USERNAME` / `PHYN_PASSWORD` - Phyn app credentials
 - `AOSMITH_EMAIL` / `AOSMITH_PASSWORD` - iComm app credentials
 - `TEDEE_API_KEY` - Tedee Personal Access Key (PAK)
+- `TESLA_CLIENT_ID` - Tesla app client ID (from developer.tesla.com)
+- `TESLA_CLIENT_SECRET` - Tesla app client secret
+- `TESLA_REFRESH_TOKEN` - Tesla OAuth refresh token (generated via tesla-setup.js)
+- `TESLA_ACCESS_TOKEN` - Tesla OAuth access token (auto-managed)
+- `TESLA_TOKEN_EXPIRY` - Token expiration timestamp (auto-managed)
+- `TESLA_ENERGY_SITE_ID` - Energy site ID (auto-discovered)
 - `GMAIL_USER` / `GMAIL_APP_PASSWORD` - Gmail SMTP for email reports
 - `REPORT_RECIPIENT` - Email address for reports
 
@@ -413,16 +474,63 @@ From `.env`:
 ## Troubleshooting Quick Reference
 
 - **401 Unauthorized (Miele):** Token expired, run `npm run auth`
+- **401 Unauthorized (Tesla):** Refresh token expired (~90 days), run `node tesla-setup.js`
 - **Remote control disabled:** User needs to enable on physical device
 - **Device not found:** Check device ID, verify device is online
 - **MCP server not responding:** Check `.mcp.json` paths and wrapper scripts
+- **Tesla "No energy products":** Ensure Powerwall is linked to your Tesla account in the app
 
 ## Testing
 
-All six MCP servers have been tested and are confirmed working:
+All seven MCP servers have been tested and are confirmed working:
 - `node test-lg-dryer.cjs` - Test LG ThinQ integration (washer + dryer)
 - `node test-miele-mcp.cjs` - Test Miele integration (oven, fridge, freezer)
 - `node test-huum-sauna.cjs` - Test HUUM sauna integration
 - `node test-phyn-mcp.cjs` - Test Phyn water monitor integration
 - `node test-aosmith-mcp.cjs` - Test A.O. Smith water heater integration
 - `node test-tedee-mcp.cjs` - Test Tedee smart lock integration
+- `node test-tesla-mcp.cjs` - Test Tesla Powerwall/Solar integration
+
+## Tesla Setup Instructions
+
+### Step 1: Register as Tesla Developer
+1. Go to https://developer.tesla.com
+2. Sign in with your Tesla account (same as app/car)
+3. Accept the developer terms of service
+
+### Step 2: Create an Application
+1. Click "Create Application"
+2. Fill in required fields:
+   - **Name:** "Home Controller" (or any name)
+   - **Description:** "Personal home energy monitoring"
+   - **Purpose:** Select "Personal Use"
+   - **Allowed Origins:** `http://localhost:3000`
+   - **Allowed Redirect URIs:** `http://localhost:3000/callback`
+3. Submit and wait for approval (usually instant for personal use)
+4. Once approved, copy `client_id` and `client_secret`
+
+### Step 3: Configure Environment
+Add to `.env`:
+```bash
+TESLA_CLIENT_ID=your_client_id_here
+TESLA_CLIENT_SECRET=your_client_secret_here
+```
+
+### Step 4: Generate Tokens
+Run the setup script:
+```bash
+node tesla-setup.js
+```
+This will:
+- Open browser for Tesla login
+- Ask you to authorize the app
+- Exchange auth code for tokens
+- Auto-discover your energy site ID
+- Save tokens to `.env` and `.tesla-tokens.json`
+
+### Step 5: Verify
+```bash
+node test-tesla-mcp.cjs
+```
+
+**Note:** Refresh tokens expire after ~90 days. The system will log warnings when expiry approaches. Re-run `node tesla-setup.js` to renew.
