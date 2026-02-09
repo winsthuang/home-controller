@@ -56,17 +56,26 @@ function loadCachedTokens() {
   try {
     if (existsSync(TOKEN_FILE)) {
       const data = JSON.parse(readFileSync(TOKEN_FILE, 'utf8'));
+
+      // Always load refresh_token and energy_site_id from cache if available
+      // (refresh_token is valid for ~90 days, independent of access_token expiry)
+      if (data.refresh_token) {
+        TESLA_REFRESH_TOKEN = data.refresh_token;
+        console.error('[Tesla MCP] Loaded refresh_token from cache');
+      }
+      if (data.energy_site_id) {
+        TESLA_ENERGY_SITE_ID = data.energy_site_id;
+      }
+
+      // Only use cached access_token if it's not expired
       if (data.access_token && data.expiry && Date.now() < data.expiry) {
         TESLA_ACCESS_TOKEN = data.access_token;
         TESLA_TOKEN_EXPIRY = data.expiry;
-        if (data.refresh_token) {
-          TESLA_REFRESH_TOKEN = data.refresh_token;
-        }
-        if (data.energy_site_id) {
-          TESLA_ENERGY_SITE_ID = data.energy_site_id;
-        }
-        console.error('[Tesla MCP] Loaded cached tokens');
+        console.error('[Tesla MCP] Loaded valid access_token from cache');
         return true;
+      } else {
+        console.error('[Tesla MCP] Cached access_token expired, will refresh');
+        return false;
       }
     }
   } catch (error) {

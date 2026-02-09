@@ -73,6 +73,7 @@ test-output/
 
 # Runtime data
 data/
+energy-analysis/data/
 logs/
 
 # Launchd plists (contain user-specific paths)
