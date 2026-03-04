@@ -13,8 +13,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // A.O. Smith API configuration (from py-aosmith reverse engineering)
-const AOSMITH_API_BASE_URL = 'https://r2.wh8.co';
-const AOSMITH_APP_VERSION = '13.0.8';
+const AOSMITH_API_BASE_URL = 'https://r1.wh8.co';
+const AOSMITH_APP_VERSION = '14.0.0';
 
 const AOSMITH_EMAIL = process.env.AOSMITH_EMAIL;
 const AOSMITH_PASSWORD = process.env.AOSMITH_PASSWORD;
@@ -93,8 +93,8 @@ const GRAPHQL_QUERIES = {
   `,
 
   getEnergyUseData: `
-    query getEnergyUseData($dsn: String!) {
-      getEnergyUseData(dsn: $dsn) {
+    query getEnergyUseData($dsn: String!, $deviceType: DeviceType!) {
+      getEnergyUseData(dsn: $dsn, deviceType: $deviceType) {
         average
         graphData {
           date
@@ -145,7 +145,7 @@ async function login() {
           'Content-Type': 'application/json',
           'brand': 'icomm',
           'version': AOSMITH_APP_VERSION,
-          'User-Agent': 'okhttp/4.9.2',
+          'User-Agent': 'okhttp/4.12.0',
         },
         timeout: 20000,
       }
@@ -196,7 +196,7 @@ async function graphqlRequest(query, variables = {}, retryCount = 0) {
           'Authorization': `Bearer ${accessToken}`,
           'brand': 'icomm',
           'version': AOSMITH_APP_VERSION,
-          'User-Agent': 'okhttp/4.9.2',
+          'User-Agent': 'okhttp/4.12.0',
         },
         timeout: 20000,
       }
@@ -486,6 +486,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const data = await graphqlRequest(GRAPHQL_QUERIES.getEnergyUseData, {
           dsn: device.dsn,
+          deviceType: device.deviceType,
         });
 
         const energyData = data.getEnergyUseData || {};
