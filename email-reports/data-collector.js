@@ -275,6 +275,7 @@ async function collectMieleData() {
         temperature: ovenData?.state?.temperature?.[0]?.value_localized,
         targetTemperature: ovenData?.state?.targetTemperature?.[0]?.value_localized,
         remainingTime: ovenData?.state?.remainingTime,
+        elapsedTime: ovenData?.state?.elapsedTime || [0, 0],
         inUse: ovenData?.state?.status?.value_localized === 'In use'
       },
       refrigerator: {
@@ -522,9 +523,11 @@ async function collectAOSmithData(retryCount = 0) {
     const energyData = energyResult.data;
 
     // Extract 7-day graph data if available
+    // MCP returns field as "recent_usage" (array of {date, kwh})
     let graphData = [];
-    if (energyData.graphData && Array.isArray(energyData.graphData)) {
-      graphData = energyData.graphData.map(d => ({
+    const usageArray = energyData.recent_usage || energyData.graphData;
+    if (usageArray && Array.isArray(usageArray)) {
+      graphData = usageArray.map(d => ({
         date: d.date,
         kwh: d.kwh || 0
       }));
@@ -532,6 +535,9 @@ async function collectAOSmithData(retryCount = 0) {
     }
 
     server.kill();
+
+    // Get today's usage from graph data (last entry)
+    const todayUsage = graphData.length > 0 ? graphData[graphData.length - 1].kwh : 0;
 
     const result = {
       success: true,
@@ -541,9 +547,9 @@ async function collectAOSmithData(retryCount = 0) {
       modeName: statusData.mode?.current || statusData.modeName,
       isOnline: statusData.online ?? statusData.isOnline,
       hotWaterStatus: statusData.hot_water_status || statusData.hotWaterStatus,
-      lifetimeKwh: energyData.lifetimeKwh || 0,
-      dailyUsage: energyData.dailyUsage || 0,
-      graphData: graphData  // NEW: 7-day energy pattern
+      lifetimeKwh: energyData.lifetime_kwh || energyData.lifetimeKwh || 0,
+      dailyUsage: todayUsage || energyData.average_daily_kwh || energyData.dailyUsage || 0,
+      graphData: graphData
     };
 
     console.error(`[AO Smith] Data collection successful. Daily usage: ${result.dailyUsage} kWh`);
@@ -746,28 +752,40 @@ async function collectTedeeData() {
           const oneDayAgo = new Date();
           oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
+          // New Tedee event codes (API v1.32+)
+          const LOCK_CODES = [32, 34, 36, 38, 56, 59, 65, 66, 90, 226, 227];
+          const UNLOCK_CODES = [33, 35, 37, 39, 57, 61, 67, 77, 88, 228, 229];
+          const MANUAL_LOCK_CODES = [38, 47];
+          const MANUAL_UNLOCK_CODES = [39];
+          const APP_LOCK_CODES = [32];
+          const APP_UNLOCK_CODES = [33];
+          const AUTO_LOCK_CODES = [36, 49];
+          const AUTO_UNLOCK_CODES = [37, 55];
+
           for (const activity of activities) {
             const activityDate = new Date(activity.date);
             if (activityDate >= oneDayAgo) {
-              // Track event counts
-              if (activity.event_code === 1) totalLocks++;  // Lock event
-              if (activity.event_code === 2) totalUnlocks++;  // Unlock event
+              const ec = activity.event_code;
 
-              // Track sources (source_code: 1=Manual button, 2=Manual, 5=Auto-unlock, 6=Auto-lock, 9=App)
-              if (activity.event_code === 1) { // Lock event
-                if (activity.source_code === 2 || activity.source_code === 1) {
+              // Track event counts
+              if (LOCK_CODES.includes(ec)) totalLocks++;
+              if (UNLOCK_CODES.includes(ec)) totalUnlocks++;
+
+              // Track sources by event code (source is now embedded in event code)
+              if (LOCK_CODES.includes(ec)) {
+                if (MANUAL_LOCK_CODES.includes(ec)) {
                   activityBreakdown.locksBySource.manual++;
-                } else if (activity.source_code === 9) {
+                } else if (APP_LOCK_CODES.includes(ec)) {
                   activityBreakdown.locksBySource.app++;
-                } else if (activity.source_code === 6) {
+                } else if (AUTO_LOCK_CODES.includes(ec)) {
                   activityBreakdown.locksBySource.autoLock++;
                 }
-              } else if (activity.event_code === 2) { // Unlock event
-                if (activity.source_code === 2 || activity.source_code === 1) {
+              } else if (UNLOCK_CODES.includes(ec)) {
+                if (MANUAL_UNLOCK_CODES.includes(ec)) {
                   activityBreakdown.unlocksBySource.manual++;
-                } else if (activity.source_code === 9) {
+                } else if (APP_UNLOCK_CODES.includes(ec)) {
                   activityBreakdown.unlocksBySource.app++;
-                } else if (activity.source_code === 5) {
+                } else if (AUTO_UNLOCK_CODES.includes(ec)) {
                   activityBreakdown.unlocksBySource.autoUnlock++;
                 }
               }

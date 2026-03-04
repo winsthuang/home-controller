@@ -71,11 +71,17 @@ export function addDailyStats(data) {
   // Edge case: if no yesterday baseline exists, we can't calculate delta - show 0
 
   // Sauna/Oven: accumulate "used" flag - once true for the day, stays true
-  // These are point-in-time checks, so OR with existing value
-  const ovenUsedNow = data.kitchen?.oven?.inUse || false;
   const saunaUsedNow = data.sauna?.heaterOn || false;
-  const ovenUsed = existing?.ovenUsed || ovenUsedNow;
   const saunaUsed = existing?.saunaUsed || saunaUsedNow;
+
+  // Oven: detect usage via elapsedTime change (not just point-in-time "In use")
+  // elapsedTime persists after oven turns off, so compare with yesterday's value
+  const ovenUsedNow = data.kitchen?.oven?.inUse || false;
+  const currentElapsed = data.kitchen?.oven?.elapsedTime || [0, 0];
+  const currentElapsedMinutes = (currentElapsed[0] || 0) * 60 + (currentElapsed[1] || 0);
+  const yesterdayElapsedMinutes = (yesterdayStats?.ovenElapsedTime?.[0] || 0) * 60 + (yesterdayStats?.ovenElapsedTime?.[1] || 0);
+  const elapsedChanged = currentElapsedMinutes !== yesterdayElapsedMinutes && currentElapsedMinutes > 0;
+  const ovenUsed = existing?.ovenUsed || ovenUsedNow || elapsedChanged;
 
   // Water: keep the max value seen today (API might return 0 early, then real value later)
   const waterGallons = Math.max(
@@ -107,6 +113,7 @@ export function addDailyStats(data) {
     washerCycleTotal: currentWasherTotal,
     washerCycles: washerLoadsToday,
     ovenUsed,
+    ovenElapsedTime: data.kitchen?.oven?.elapsedTime || [0, 0],
     saunaUsed,
     fridgeTemp: parseFloat(data.kitchen?.refrigerator?.temperature) || null,
     freezerTemp: parseFloat(data.kitchen?.freezer?.temperature) || null,
@@ -387,6 +394,31 @@ export function getWeekToDate() {
 }
 
 /**
+ * Get sparkline data for a metric over last N days
+ */
+export function getDailySparklineData(metric, days = 14) {
+  const history = loadHistory();
+  const data = [];
+
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    const dateStr = date.toISOString().split('T')[0];
+    const dayStat = history.dailyStats.find(s => s.date === dateStr);
+
+    if (dayStat) {
+      // Handle boolean metrics (saunaUsed, ovenUsed) as 0/1
+      const value = dayStat[metric];
+      data.push(typeof value === 'boolean' ? (value ? 1 : 0) : (value || 0));
+    } else {
+      data.push(0);
+    }
+  }
+
+  return data;
+}
+
+/**
  * Get sparkline data for a metric over last N weeks
  */
 export function getSparklineData(metric, weeks = 12) {
@@ -419,7 +451,7 @@ export function generateSparkline(data) {
   const range = max - min || 1;
 
   return data.map(value => {
-    if (value === 0) return '▁';
+    if (value === 0) return '·';
     const index = Math.floor(((value - min) / range) * (chars.length - 1));
     return chars[Math.min(index, chars.length - 1)];
   }).join('');

@@ -3,8 +3,8 @@
 
 import {
   getYesterday, get7DayAverage, getWeeklyStats, get4WeekAverage,
-  get12WeekAverage, getWeekToDate, getSparklineData, generateSparkline,
-  percentChange, calculateBatteryDischargeRate
+  get12WeekAverage, getWeekToDate, getDailySparklineData, getSparklineData,
+  generateSparkline, percentChange, calculateBatteryDischargeRate
 } from './history-store.js';
 import { costConfig, benchmarks } from './config.js';
 import { generateMaintenanceAlerts } from './data-collector.js';
@@ -13,53 +13,54 @@ import { generateMaintenanceAlerts } from './data-collector.js';
  * Generate executive summary for daily report
  */
 function generateDailyExecutiveSummary(data, history) {
-  const avg7Day = get7DayAverage();
-  const highlights = [];
+  const avg12Week = get12WeekAverage();
+  const lines = [];
+  const anomalies = [];
 
-  // Solar production highlight
-  if (data.tesla?.solarProduction && avg7Day?.solarProduction) {
-    const pct = percentChange(data.tesla.solarProduction, avg7Day.solarProduction);
-    if (pct !== null) {
-      const dir = pct > 0 ? 'up' : 'down';
-      highlights.push(`Solar ${dir} ${Math.abs(pct).toFixed(0)}% (${data.tesla.solarProduction.toFixed(1)} kWh)`);
-    }
-  } else if (data.tesla?.solarProduction) {
-    highlights.push(`Generated ${data.tesla.solarProduction.toFixed(1)} kWh solar`);
-  }
-
-  // Battery status if noteworthy
-  if (data.tesla?.batteryLevel && data.tesla.batteryLevel < 30) {
-    highlights.push(`Powerwall at ${data.tesla.batteryLevel}%`);
-  }
-
-  // Water usage comparison
-  if (data.water?.dailyConsumption && avg7Day?.waterGallons) {
-    const pct = percentChange(data.water.dailyConsumption, avg7Day.waterGallons);
-    if (pct !== null) {
-      const dir = pct > 0 ? 'up' : 'down';
-      highlights.push(`Water usage ${dir} ${Math.abs(pct).toFixed(0)}% from 7-day avg`);
-    }
-  }
-
-  // Energy usage comparison
-  if (data.waterHeater?.dailyUsage && avg7Day?.energyKwh) {
-    const pct = percentChange(data.waterHeater.dailyUsage, avg7Day.energyKwh);
-    if (pct !== null) {
-      const dir = pct > 0 ? 'up' : 'down';
-      highlights.push(`Energy ${dir} ${Math.abs(pct).toFixed(0)}%`);
-    }
-  }
-
-  // Alerts
+  // Only flag data collection errors
   if (data.errors?.length > 0) {
-    highlights.unshift(`${data.errors.length} system alert(s)`);
+    anomalies.push(`⚠️ ${data.errors.length} data collection error(s)`);
   }
 
-  if (highlights.length === 0) {
-    highlights.push('All systems normal');
+  // Flag dramatic outliers vs 12-week average (>2x normal)
+  if (data.water?.dailyConsumption && avg12Week?.waterGallons && avg12Week.waterGallons > 0) {
+    const ratio = data.water.dailyConsumption / avg12Week.waterGallons;
+    if (ratio > 2) {
+      anomalies.push(`⚠️ Water usage ${ratio.toFixed(1)}x above normal (${data.water.dailyConsumption.toFixed(0)} vs avg ${avg12Week.waterGallons.toFixed(0)} gal)`);
+    }
   }
 
-  return highlights.join('. ') + '.';
+  if (data.waterHeater?.dailyUsage && avg12Week?.energyKwh && avg12Week.energyKwh > 0) {
+    const ratio = data.waterHeater.dailyUsage / avg12Week.energyKwh;
+    if (ratio > 2) {
+      anomalies.push(`⚠️ Water heater energy ${ratio.toFixed(1)}x above normal (${data.waterHeater.dailyUsage.toFixed(1)} vs avg ${avg12Week.energyKwh.toFixed(1)} kWh)`);
+    }
+  }
+
+  if (anomalies.length > 0) {
+    lines.push(anomalies.join('. '));
+  }
+
+  // Headline numbers
+  const parts = [];
+  if (data.tesla?.solarProduction != null) {
+    parts.push(`${data.tesla.solarProduction.toFixed(1)} kWh solar`);
+  }
+  if (data.tesla?.batteryLevel != null) {
+    parts.push(`Powerwall ${Math.round(data.tesla.batteryLevel)}%`);
+  }
+  if (data.water?.dailyConsumption) {
+    parts.push(`${data.water.dailyConsumption.toFixed(0)} gal water`);
+  }
+  if (data.waterHeater?.dailyUsage) {
+    parts.push(`${data.waterHeater.dailyUsage.toFixed(1)} kWh heating`);
+  }
+
+  if (parts.length > 0) {
+    lines.push(parts.join(' · '));
+  }
+
+  return lines.join('\n');
 }
 
 /**
@@ -179,7 +180,7 @@ function generateSolarBatterySection(data, history) {
 <pre>Solar Production:   ${tesla.solarProduction.toFixed(1)} kWh  ($${solarValue.toFixed(2)} value)
 vs 7-Day Avg:       ${solarVsAvg || 'N/A'} ${avg7Day?.solarProduction ? `(${avg7Day.solarProduction.toFixed(1)} kWh)` : ''}
 
-Powerwall:          ${tesla.batteryLevel || 'N/A'}% ${tesla.batteryLevel ? `(${getBatteryStatusText()})` : ''}
+Powerwall:          ${tesla.batteryLevel != null ? Math.round(tesla.batteryLevel) : 'N/A'}% ${tesla.batteryLevel ? `(${getBatteryStatusText()})` : ''}
 Backup Reserve:     ${tesla.backupReserve || 'N/A'}%${tesla.stormModeActive ? ' ⚠️ Storm Watch Active' : ''}
 
 Grid Import:        ${tesla.gridImport.toFixed(1)} kWh  ($${gridCost.toFixed(2)})
@@ -188,6 +189,8 @@ Net Position:       ${netPositionText}
 
 Home Consumption:   ${tesla.homeConsumption.toFixed(1)} kWh
 Self-Powered:       ${tesla.historySelfPowered || tesla.selfPoweredPercentage || 'N/A'}%
+
+14-Day Solar:       <span class="sparkline">${generateSparkline(getDailySparklineData('solarProduction', 14))}</span>
 
 Current Status:
   Solar:            ${formatPower(tesla.solarPower)} ${tesla.solarPower > 0 ? '☀️' : '🌙'}
@@ -200,54 +203,132 @@ Current Status:
 }
 
 /**
+ * Format cost value, showing credit for negative amounts
+ */
+function formatCost(val) {
+  if (val < 0) return `+$${Math.abs(val).toFixed(2)} credit`;
+  return `$${val.toFixed(2)}`;
+}
+
+/**
  * Generate Cost Snapshot section for daily report
+ * Shows whole-home electricity with water heater breakout when Tesla data available
  */
 function generateCostSnapshot(data, history) {
-  const yesterday = getYesterday();
   const weekToDate = getWeekToDate();
   const avg7Day = get7DayAverage();
-
-  const yesterdayKwh = data.waterHeater?.dailyUsage || 0;
-  const yesterdayCost = yesterdayKwh * costConfig.electricityCostPerKwh;
-
-  const weekKwh = weekToDate?.energyKwh || 0;
-  const weekCost = weekKwh * costConfig.electricityCostPerKwh;
-
-  const dailyAvgKwh = avg7Day?.energyKwh || yesterdayKwh;
-  const dailyAvgCost = dailyAvgKwh * costConfig.electricityCostPerKwh;
-
-  const monthlyProjection = dailyAvgCost * costConfig.projectionDaysInMonth;
-
-  // Calculate comparison with last month
   const avg4Week = get4WeekAverage();
-  const lastMonthEstimate = (avg4Week?.energyKwh || dailyAvgKwh) * costConfig.projectionDaysInMonth * costConfig.electricityCostPerKwh;
-  const savingsVsLastMonth = lastMonthEstimate - monthlyProjection;
-  const savingsPct = lastMonthEstimate > 0 ? (savingsVsLastMonth / lastMonthEstimate) * 100 : 0;
+
+  const tesla = data.tesla;
+  const hasTesla = tesla && tesla.homeConsumption != null && tesla.homeConsumption > 0;
+
+  // Water heater data
+  const whKwh = data.waterHeater?.dailyUsage || 0;
+  const whMode = data.waterHeater?.operationMode || data.waterHeater?.modeName || 'Unknown';
+  const whModeCheck = (whMode === 'HEAT_PUMP' || whMode === 'Heat Pump') ? '✓' : '⚠️';
+
+  if (!hasTesla) {
+    // Fallback: water-heater-only view (Tesla offline)
+    const yesterdayCost = whKwh * costConfig.electricityCostPerKwh;
+    const weekKwh = weekToDate?.energyKwh || 0;
+    const weekCost = weekKwh * costConfig.electricityCostPerKwh;
+    const dailyAvgKwh = avg7Day?.energyKwh || whKwh;
+    const dailyAvgCost = dailyAvgKwh * costConfig.electricityCostPerKwh;
+    const monthlyProjection = dailyAvgCost * costConfig.projectionDaysInMonth;
+
+    return `
+    <div class="section">
+      <div class="section-title">💰 ENERGY COST SNAPSHOT</div>
+      <div class="box">
+<pre>⚠️ No whole-home data (Tesla offline)
+
+Yesterday's Water Heating:
+  Energy Used:      ${whKwh.toFixed(1)} kWh
+  Cost:             $${yesterdayCost.toFixed(2)}  (@ $${costConfig.electricityCostPerKwh.toFixed(2)}/kWh)
+  Mode:             ${whMode} ${whModeCheck}
+
+Week-to-date:       ${weekKwh.toFixed(1)} kWh  ($${weekCost.toFixed(2)})
+Daily Average:      ${dailyAvgKwh.toFixed(1)} kWh/day  ($${dailyAvgCost.toFixed(2)}/day)
+Monthly Projection: $${monthlyProjection.toFixed(2)}</pre>
+      </div>
+    </div>
+  `;
+  }
+
+  // Whole-home electricity calculations
+  const homeConsumption = tesla.homeConsumption;
+  const gridImport = tesla.gridImport;
+  const gridExport = tesla.gridExport;
+  const solarOffset = homeConsumption - gridImport;
+
+  const gridCost = gridImport * costConfig.electricityCostPerKwh;
+  const exportCredit = gridExport * costConfig.electricityCostPerKwh;
+  const solarAvoided = solarOffset * costConfig.electricityCostPerKwh;
+  const netCost = gridCost - exportCredit;
+
+  // Water heater breakout (cap at 100% for timing mismatches)
+  const whPct = homeConsumption > 0 ? Math.min(whKwh / homeConsumption * 100, 100) : 0;
+  const restOfHouseKwh = Math.max(homeConsumption - whKwh, 0);
+  const restOfHousePct = 100 - whPct;
+
+  // 14-day sparkline
+  const homeSparkline = generateSparkline(getDailySparklineData('homeConsumption', 14));
+  const homeAvgLabel = avg7Day?.homeConsumption ? `avg ${avg7Day.homeConsumption.toFixed(1)} kWh` : '';
+
+  // Week-to-date net cost
+  const weekGridImport = weekToDate?.gridImport || 0;
+  const weekGridExport = weekToDate?.gridExport || 0;
+  const weekHomeKwh = weekToDate?.homeConsumption || 0;
+  const weekNetCost = (weekGridImport - weekGridExport) * costConfig.electricityCostPerKwh;
+
+  // Daily average net cost (7-day)
+  const avg7DayGridImport = avg7Day?.gridImport || 0;
+  const avg7DayGridExport = avg7Day?.gridExport || 0;
+  const avg7DayNetCost = (avg7DayGridImport - avg7DayGridExport) * costConfig.electricityCostPerKwh;
+  const dailyAvgHomeKwh = avg7Day?.homeConsumption || homeConsumption;
+
+  // Monthly projection from 7-day average
+  const monthlyProjection = avg7DayNetCost * costConfig.projectionDaysInMonth;
+
+  // vs last month (4-week average)
+  const avg4WeekGridImport = avg4Week?.gridImport || 0;
+  const avg4WeekGridExport = avg4Week?.gridExport || 0;
+  const avg4WeekNetCost = (avg4WeekGridImport - avg4WeekGridExport) * costConfig.electricityCostPerKwh;
+  const lastMonthProj = avg4WeekNetCost * costConfig.projectionDaysInMonth;
+  const savingsVsLastMonth = lastMonthProj - monthlyProjection;
+  const savingsPct = lastMonthProj !== 0 ? (savingsVsLastMonth / Math.abs(lastMonthProj)) * 100 : 0;
 
   const savingsText = savingsVsLastMonth > 0
     ? `▼ -${Math.abs(savingsPct).toFixed(0)}%  (saved $${savingsVsLastMonth.toFixed(2)})`
-    : `▲ +${Math.abs(savingsPct).toFixed(0)}%  (added $${Math.abs(savingsVsLastMonth).toFixed(2)})`;
+    : savingsVsLastMonth < 0
+      ? `▲ +${Math.abs(savingsPct).toFixed(0)}%  (added $${Math.abs(savingsVsLastMonth).toFixed(2)})`
+      : '─ no change';
 
-  const mode = data.waterHeater?.operationMode || data.waterHeater?.modeName || 'Unknown';
-  const modeCheck = mode === 'HEAT_PUMP' || mode === 'Heat Pump' ? '✓' : '⚠️';
+  // Water heater breakout section (only if we have water heater data)
+  const whBreakout = whKwh > 0 ? `
+Water Heater Breakout:
+  Water Heater:     ${whKwh.toFixed(1)} kWh  (${whPct.toFixed(0)}% of home)
+  Rest of House:    ${restOfHouseKwh.toFixed(1)} kWh  (${restOfHousePct.toFixed(0)}% of home)
+  Mode: ${whMode} ${(whMode === 'HEAT_PUMP' || whMode === 'Heat Pump') ? '(most efficient) ✓' : whModeCheck}` : '';
 
   return `
     <div class="section">
       <div class="section-title">💰 ENERGY COST SNAPSHOT</div>
       <div class="box">
-<pre>Yesterday's Water Heating:
-  Energy Used:      ${yesterdayKwh.toFixed(1)} kWh
-  Cost:             $${yesterdayCost.toFixed(2)}  (@ $${costConfig.electricityCostPerKwh.toFixed(2)}/kWh)
+<pre>Yesterday's Whole-Home Electricity:
+  Home Consumption: ${homeConsumption.toFixed(1)} kWh
+  Grid Import:      ${gridImport.toFixed(1)} kWh  ($${gridCost.toFixed(2)})
+  Solar Offset:     ${solarOffset.toFixed(1)} kWh  ($${solarAvoided.toFixed(2)} avoided)
+  Grid Export:      ${gridExport.toFixed(1)} kWh  ($${exportCredit.toFixed(2)} credit)
+  Net Cost:         ${formatCost(netCost)}
+${whBreakout}
 
-Week-to-date:       ${weekKwh.toFixed(1)} kWh  ($${weekCost.toFixed(2)})
-Daily Average:      ${dailyAvgKwh.toFixed(1)} kWh/day  ($${dailyAvgCost.toFixed(2)}/day)
+14-Day Trend:   <span class="sparkline">${homeSparkline}</span>  ${homeAvgLabel}
 
-Monthly Projection: $${monthlyProjection.toFixed(2)}
-  vs Last Month:    ${savingsText}
-
-💡 Efficiency Tip:
-   HEAT_PUMP mode saves ~$15-20/month vs ELECTRIC
-   mode. Your current mode: ${mode} ${modeCheck}</pre>
+Week-to-date:       ${weekHomeKwh.toFixed(1)} kWh  (${formatCost(weekNetCost)} net)
+Daily Avg (7d):     ${dailyAvgHomeKwh.toFixed(1)} kWh/day  (${formatCost(avg7DayNetCost)}/day)
+Monthly Projection: ${formatCost(monthlyProjection)} net
+  vs Last Month:    ${savingsText}</pre>
       </div>
     </div>
   `;
@@ -304,7 +385,7 @@ function generateMaintenanceAlertsSection(alerts) {
  * Generate 7-day energy pattern visualization
  */
 function generate7DayEnergyPattern(data, history) {
-  const sparklineData = getSparklineData('energyKwh', 7);
+  const sparklineData = getDailySparklineData('energyKwh', 7);
   const sparkline = generateSparkline(sparklineData);
 
   // Get day labels (Mon, Tue, etc.)
@@ -322,10 +403,13 @@ function generate7DayEnergyPattern(data, history) {
   const maxDay = days[sparklineData.indexOf(maxValue)];
   const minDay = days[sparklineData.indexOf(minValue)];
 
+  // Space sparkline chars to align with day labels and values (5-char columns)
+  const spacedSparkline = sparkline.split('').map(c => ` ${c} `).join('  ');
+
   return `
 7-Day Energy Pattern:
   ${days.join('  ')}
-  ${sparkline}
+  ${spacedSparkline}
   ${values.join('  ')} kWh
 
 Peak Usage:         ${maxDay} (${maxValue.toFixed(1)} kWh, $${(maxValue * costConfig.electricityCostPerKwh).toFixed(2)})
@@ -333,131 +417,138 @@ Lowest Usage:       ${minDay} (${minValue.toFixed(1)} kWh, $${(minValue * costCo
 }
 
 /**
- * Generate Weekly Solar Summary for weekly report
+ * Generate unified Weekly Energy & Cost section for weekly report
+ * Replaces separate generateWeeklySolarSummary + generateWeeklyCostSummary
  */
-function generateWeeklySolarSummary(data, history) {
+function generateWeeklyEnergyCost(data, history) {
   const thisWeek = getWeeklyStats(0);
   const lastWeek = getWeeklyStats(1);
   const avg4Week = get4WeekAverage();
+  const avg12Week = get12WeekAverage();
 
-  // If no solar data, return empty
-  if (!thisWeek?.solarProduction && !data.tesla?.solarProduction) {
-    return '';
+  const hasTesla = (thisWeek?.homeConsumption > 0) || (data.tesla?.homeConsumption > 0);
+
+  // Water heater data
+  const whKwh = thisWeek?.energyKwh || 0;
+  const whMode = data.waterHeater?.operationMode || data.waterHeater?.modeName || 'Unknown';
+  const whModeCheck = (whMode === 'HEAT_PUMP' || whMode === 'Heat Pump') ? '✓' : '⚠️';
+
+  if (!hasTesla) {
+    // Fallback: water-heater-only view (Tesla offline)
+    const whCost = whKwh * costConfig.electricityCostPerKwh;
+    const lastWeekKwh = lastWeek?.energyKwh || 0;
+    const lastWeekCost = lastWeekKwh * costConfig.electricityCostPerKwh;
+    const savingsVsLast = lastWeekCost - whCost;
+    const savingsPctLast = lastWeekCost > 0 ? (savingsVsLast / lastWeekCost) * 100 : 0;
+    const savingsTextLast = savingsVsLast > 0
+      ? `▼ -${Math.abs(savingsPctLast).toFixed(0)}%  (saved $${savingsVsLast.toFixed(2)})`
+      : `▲ +${Math.abs(savingsPctLast).toFixed(0)}%  (added $${Math.abs(savingsVsLast).toFixed(2)})`;
+
+    return `
+    <div class="section">
+      <div class="section-title">💰 WEEKLY ENERGY & COST</div>
+      <div class="box">
+<pre>⚠️ No whole-home data (Tesla offline)
+
+Water Heater This Week: ${whKwh.toFixed(1)} kWh  ($${whCost.toFixed(2)})
+  Mode: ${whMode} ${whModeCheck}
+
+vs Last Week:       ${savingsTextLast}</pre>
+      </div>
+    </div>
+  `;
   }
 
-  const weekSolar = thisWeek?.solarProduction || 0;
+  // Whole-home data
+  const weekConsumption = thisWeek?.homeConsumption || 0;
   const weekImport = thisWeek?.gridImport || 0;
   const weekExport = thisWeek?.gridExport || 0;
-  const weekConsumption = thisWeek?.homeConsumption || 0;
+  const weekSolar = thisWeek?.solarProduction || 0;
 
-  // Calculate self-powered percentage
+  const gridCost = weekImport * costConfig.electricityCostPerKwh;
+  const solarValue = weekSolar * costConfig.electricityCostPerKwh;
+  const exportCredit = weekExport * costConfig.electricityCostPerKwh;
+  const netCost = gridCost - exportCredit;
+
+  // Self-powered percentage
   const selfPowered = weekConsumption > 0
     ? Math.round((1 - weekImport / weekConsumption) * 100)
     : 0;
 
-  // Net position
-  const netGrid = weekExport - weekImport;
+  // Water heater breakout (cap at 100% for timing mismatches)
+  const whPct = weekConsumption > 0 ? Math.min(whKwh / weekConsumption * 100, 100) : 0;
+  const restOfHouseKwh = Math.max(weekConsumption - whKwh, 0);
+  const restOfHousePct = 100 - whPct;
 
-  // Comparisons
-  const solarVsLast = lastWeek?.solarProduction
-    ? formatChangeArrow(weekSolar, lastWeek.solarProduction)
-    : '';
-  const solarVs4Week = avg4Week?.solarProduction
-    ? formatChangeArrow(weekSolar, avg4Week.solarProduction)
-    : '';
+  // vs Last Week (net cost based)
+  const lastWeekNetCost = lastWeek
+    ? ((lastWeek.gridImport || 0) - (lastWeek.gridExport || 0)) * costConfig.electricityCostPerKwh
+    : null;
+  let vsLastWeekText = 'N/A';
+  if (lastWeekNetCost !== null && Math.abs(lastWeekNetCost) > 0) {
+    const diff = lastWeekNetCost - netCost;
+    const pct = (diff / Math.abs(lastWeekNetCost)) * 100;
+    vsLastWeekText = diff > 0
+      ? `▼ -${Math.abs(pct).toFixed(0)}%  (saved $${diff.toFixed(2)})`
+      : `▲ +${Math.abs(pct).toFixed(0)}%  (added $${Math.abs(diff).toFixed(2)})`;
+  }
 
-  // Value calculations
-  const solarValue = weekSolar * costConfig.solarValuePerKwh;
-  const gridCost = weekImport * costConfig.electricityCostPerKwh;
-  const netSavings = solarValue - gridCost;
+  // vs 4-Week Avg (net cost based)
+  const avg4WeekNetCost = avg4Week
+    ? ((avg4Week.gridImport || 0) - (avg4Week.gridExport || 0)) * costConfig.electricityCostPerKwh
+    : null;
+  let vs4WeekText = 'N/A';
+  if (avg4WeekNetCost !== null && Math.abs(avg4WeekNetCost) > 0) {
+    const diff = avg4WeekNetCost - netCost;
+    const pct = (diff / Math.abs(avg4WeekNetCost)) * 100;
+    vs4WeekText = diff > 0
+      ? `▼ -${Math.abs(pct).toFixed(0)}%  (saved $${diff.toFixed(2)})`
+      : `▲ +${Math.abs(pct).toFixed(0)}%  (added $${Math.abs(diff).toFixed(2)})`;
+  }
 
-  // Sparkline for solar production
-  const solarSparkline = generateSparkline(getSparklineData('solarProduction', 12));
+  // 12-week sparkline
+  const homeSparkline = generateSparkline(getSparklineData('homeConsumption', 12));
+  const homeAvgLabel = avg12Week?.homeConsumption ? `avg ${avg12Week.homeConsumption.toFixed(0)} kWh` : '';
 
-  return `
-    <div class="section">
-      <div class="section-title">☀️ WEEKLY ENERGY SUMMARY</div>
-      <div class="box">
-<pre>Solar Generated:    ${weekSolar.toFixed(1)} kWh  ($${solarValue.toFixed(2)} value)
-vs Last Week:       ${solarVsLast || 'N/A'} ${lastWeek?.solarProduction ? `(${lastWeek.solarProduction.toFixed(1)} kWh)` : ''}
-vs 4-Week Avg:      ${solarVs4Week || 'N/A'} ${avg4Week?.solarProduction ? `(${avg4Week.solarProduction.toFixed(1)} kWh)` : ''}
+  // Monthly projection
+  const daysRecorded = Math.max(thisWeek?.daysRecorded || 7, 1);
+  const dailyNetCost = netCost / daysRecorded;
+  const monthlyProjection = dailyNetCost * costConfig.projectionDaysInMonth;
 
-Grid Import:        ${weekImport.toFixed(1)} kWh  ($${gridCost.toFixed(2)})
-Grid Export:        ${weekExport.toFixed(1)} kWh
-Net Position:       ${netGrid >= 0 ? `Net Exporter (+${netGrid.toFixed(1)} kWh)` : `Net Importer (${netGrid.toFixed(1)} kWh)`}
+  // Year-to-date
+  const weeksInYear = Math.max(1, Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (7 * 86400000)));
+  const representativeWeeklyNetCost = avg4WeekNetCost !== null ? avg4WeekNetCost : netCost;
+  const ytdCost = representativeWeeklyNetCost * weeksInYear;
+  const annualProjection = representativeWeeklyNetCost * 52;
 
-Home Consumption:   ${weekConsumption.toFixed(1)} kWh
-Self-Powered Avg:   ${selfPowered}%
-
-Net Savings:        ${netSavings >= 0 ? '+' : ''}$${netSavings.toFixed(2)} ${netSavings >= 0 ? '(solar offset grid cost)' : ''}
-
-12-Week Solar:      <span class="sparkline">${solarSparkline}</span></pre>
-      </div>
-    </div>
-  `;
-}
-
-/**
- * Generate Weekly Cost Summary for weekly report
- */
-function generateWeeklyCostSummary(data, history) {
-  const thisWeek = getWeeklyStats(0);
-  const lastWeek = getWeeklyStats(1);
-  const avg4Week = get4WeekAverage();
-
-  const thisWeekKwh = thisWeek?.energyKwh || 0;
-  const thisWeekCost = thisWeekKwh * costConfig.electricityCostPerKwh;
-
-  const lastWeekKwh = lastWeek?.energyKwh || thisWeekKwh;
-  const lastWeekCost = lastWeekKwh * costConfig.electricityCostPerKwh;
-
-  const avg4WeekKwh = avg4Week?.energyKwh || thisWeekKwh;
-  const avg4WeekCost = avg4WeekKwh * costConfig.electricityCostPerKwh;
-
-  const savingsVsLast = lastWeekCost - thisWeekCost;
-  const savingsPctLast = lastWeekCost > 0 ? (savingsVsLast / lastWeekCost) * 100 : 0;
-  const savingsTextLast = savingsVsLast > 0
-    ? `▼ -${Math.abs(savingsPctLast).toFixed(0)}%  (saved $${savingsVsLast.toFixed(2)})`
-    : `▲ +${Math.abs(savingsPctLast).toFixed(0)}%  (added $${Math.abs(savingsVsLast).toFixed(2)})`;
-
-  const savingsVs4Week = avg4WeekCost - thisWeekCost;
-  const savingsPct4Week = avg4WeekCost > 0 ? (savingsVs4Week / avg4WeekCost) * 100 : 0;
-  const savingsText4Week = savingsVs4Week > 0
-    ? `▼ -${Math.abs(savingsPct4Week).toFixed(0)}%  (saved $${savingsVs4Week.toFixed(2)})`
-    : `▲ +${Math.abs(savingsPct4Week).toFixed(0)}%  (added $${Math.abs(savingsVs4Week).toFixed(2)})`;
-
-  const dailyAvgKwh = thisWeekKwh / 7;
-  const dailyAvgCost = dailyAvgKwh * costConfig.electricityCostPerKwh;
-  const monthlyProjection = dailyAvgCost * costConfig.projectionDaysInMonth;
-
-  const lastMonthEstimate = avg4WeekKwh / 7 * costConfig.projectionDaysInMonth * costConfig.electricityCostPerKwh;
-  const savingsVsLastMonth = lastMonthEstimate - monthlyProjection;
-
-  // Calculate year-to-date (assuming 5 weeks so far in the plan context)
-  const weeksInYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (7 * 86400000));
-  const ytdCost = avg4WeekKwh * weeksInYear * costConfig.electricityCostPerKwh;
-  const annualProjection = (ytdCost / weeksInYear) * 52;
+  // Water heater breakout section (only if we have water heater data)
+  const whBreakout = whKwh > 0 ? `
+Water Heater Breakout:
+  Water Heater:     ${whKwh.toFixed(1)} kWh  (${whPct.toFixed(0)}% of home)
+  Rest of House:    ${restOfHouseKwh.toFixed(1)} kWh  (${restOfHousePct.toFixed(0)}% of home)
+  Mode: ${whMode} ${(whMode === 'HEAT_PUMP' || whMode === 'Heat Pump') ? '(most efficient) ✓' : whModeCheck}` : '';
 
   return `
     <div class="section">
-      <div class="section-title">💰 WEEKLY COST SUMMARY</div>
+      <div class="section-title">💰 WEEKLY ENERGY & COST</div>
       <div class="box">
-<pre>This Week's Total:  $${thisWeekCost.toFixed(2)}
-  Water Heating:    $${thisWeekCost.toFixed(2)}  (${thisWeekKwh.toFixed(1)} kWh @ $${costConfig.electricityCostPerKwh.toFixed(2)}/kWh)
-  Water: FREE (well water)
+<pre>This Week's Whole-Home Electricity:
+  Home Consumption: ${weekConsumption.toFixed(1)} kWh
+  Grid Import:      ${weekImport.toFixed(1)} kWh  ($${gridCost.toFixed(2)})
+  Solar Generated:  ${weekSolar.toFixed(1)} kWh  ($${solarValue.toFixed(2)} value)
+  Grid Export:      ${weekExport.toFixed(1)} kWh  ($${exportCredit.toFixed(2)} credit)
+  Net Cost:         ${formatCost(netCost)}
+  Self-Powered:     ${selfPowered}%
+${whBreakout}
 
-vs Last Week:       ${savingsTextLast}
-vs 4-Week Avg:      ${savingsText4Week}
+vs Last Week:       ${vsLastWeekText}
+vs 4-Week Avg:      ${vs4WeekText}
 
-Monthly Projection: $${monthlyProjection.toFixed(2)}
-  ${savingsVsLastMonth > 0 ? `On track to save $${savingsVsLastMonth.toFixed(2)} vs last month` : `On track to add $${Math.abs(savingsVsLastMonth).toFixed(2)} vs last month`}
+12-Week Trend:  <span class="sparkline">${homeSparkline}</span>  ${homeAvgLabel}
 
-Year-to-Date:       $${ytdCost.toFixed(2)} (${weeksInYear} weeks)
-Projected Annual:   $${annualProjection.toFixed(2)}
-
-💡 Savings Tip:
-   Your HEAT_PUMP mode is saving ~$180-240/year
-   compared to ELECTRIC mode. Keep it up!</pre>
+Monthly Projection: ${formatCost(monthlyProjection)} net
+Year-to-Date:       ${formatCost(ytdCost)} (${weeksInYear} weeks)
+Projected Annual:   ${formatCost(annualProjection)}</pre>
       </div>
     </div>
   `;
@@ -518,11 +609,6 @@ function generateMaintenanceForecast(data, history) {
 
   // Efficiency opportunities
   const efficiencyOpp = [];
-  if (data.waterHeater?.operationMode === 'HEAT_PUMP' || data.waterHeater?.modeName === 'Heat Pump') {
-    efficiencyOpp.push('Running HEAT_PUMP mode saves $15-20/month\n    vs ELECTRIC mode. Current: ON TRACK! ✓');
-  } else if (data.waterHeater?.operationMode) {
-    efficiencyOpp.push(`Switch to HEAT_PUMP mode to save $15-20/month\n    Current mode: ${data.waterHeater.operationMode}`);
-  }
 
   const avg7Day = get7DayAverage();
   if (avg7Day?.waterGallons) {
@@ -742,7 +828,9 @@ System Status:
   Flow Rate:        ${data.water?.flow?.toFixed(1) || '0.0'} GPM  ${data.water?.flow > 0 ? '(active usage)' : '(no active usage)'}
   Main Valve:       ${data.water?.valveStatus || 'Unknown'}
   Auto-Shutoff:     ${data.water?.autoShutoff ? 'Enabled ✓' : 'Disabled'}
-  WiFi Signal:      ${data.water?.signalStrength ? `${data.water.signalStrength} dBm ${data.water.signalStrength > -50 ? '(excellent)' : data.water.signalStrength > -70 ? '(good)' : '(weak)'}` : 'N/A'}${data.water?.fixtureBreakdown && data.water.fixtureBreakdown.length > 0 ? `
+  WiFi Signal:      ${data.water?.signalStrength ? `${data.water.signalStrength} dBm ${data.water.signalStrength > -50 ? '(excellent)' : data.water.signalStrength > -70 ? '(good)' : '(weak)'}` : 'N/A'}
+
+14-Day Trend:       <span class="sparkline">${generateSparkline(getDailySparklineData('waterGallons', 14))}</span>${data.water?.fixtureBreakdown && data.water.fixtureBreakdown.length > 0 ? `
 
 Fixture Breakdown (Yesterday):${data.water.fixtureBreakdown.map(f => `
   ${f.name}:${' '.repeat(Math.max(1, 18 - f.name.length))}${f.gallons.toFixed(1)} gal  (${f.percentage}%)  ${'▂'.repeat(Math.max(1, Math.floor(f.percentage / 5)))}`).join('')}` : ''}</pre>
@@ -761,6 +849,8 @@ Hot Water:          ${data.waterHeater?.hotWaterStatus || 'Unknown'}
 Weekly Energy:      ${(weekToDate?.energyKwh || 0).toFixed(1)} kWh  ($${((weekToDate?.energyKwh || 0) * costConfig.electricityCostPerKwh).toFixed(2)})
 Daily Average:      ${(avg7Day?.energyKwh || 0).toFixed(1)} kWh/day  ($${((avg7Day?.energyKwh || 0) * costConfig.electricityCostPerKwh).toFixed(2)}/day)
 
+14-Day Trend:       <span class="sparkline">${generateSparkline(getDailySparklineData('energyKwh', 14))}</span>
+
 ${generate7DayEnergyPattern(data, history)}</pre>
       </div>
     </div>
@@ -770,7 +860,9 @@ ${generate7DayEnergyPattern(data, history)}</pre>
       <div class="box">
 <pre>Week-to-date:      ${weekToDate?.washerCycles || 0} wash cycles
 Yesterday:         ${yesterday ? (yesterday.washerCycles || 0) + ' cycles' : 'N/A'}
-7-Day Avg:         ${avg7Day ? (avg7Day.washerCycles).toFixed(1) + ' cycles/day' : 'N/A'}</pre>
+7-Day Avg:         ${avg7Day ? (avg7Day.washerCycles).toFixed(1) + ' cycles/day' : 'N/A'}
+
+14-Day Trend:      <span class="sparkline">${generateSparkline(getDailySparklineData('washerCycles', 14))}</span></pre>
       </div>
     </div>
 
@@ -779,7 +871,9 @@ Yesterday:         ${yesterday ? (yesterday.washerCycles || 0) + ' cycles' : 'N/
       <div class="box">
 <pre>Week-to-date:      ${weekToDate?.saunaSessions || 0} sessions
 Yesterday:         ${yesterday ? (yesterday.saunaUsed ? '1' : '0') + ' session' : 'N/A'}
-7-Day Avg:         ${avg7Day ? (avg7Day.saunaSessions).toFixed(1) + ' sessions/day' : 'N/A'}</pre>
+7-Day Avg:         ${avg7Day ? (avg7Day.saunaSessions).toFixed(1) + ' sessions/day' : 'N/A'}
+
+14-Day Trend:      <span class="sparkline">${generateSparkline(getDailySparklineData('saunaUsed', 14))}</span></pre>
       </div>
     </div>
 
@@ -788,7 +882,9 @@ Yesterday:         ${yesterday ? (yesterday.saunaUsed ? '1' : '0') + ' session' 
       <div class="box">
 <pre>Week-to-date:      ${weekToDate?.ovenUses || 0} uses
 Yesterday:         ${yesterday ? (yesterday.ovenUsed ? '1' : '0') + ' use' : 'N/A'}
-7-Day Avg:         ${avg7Day ? (avg7Day.ovenUses).toFixed(1) + ' uses/day' : 'N/A'}</pre>
+7-Day Avg:         ${avg7Day ? (avg7Day.ovenUses).toFixed(1) + ' uses/day' : 'N/A'}
+
+14-Day Trend:      <span class="sparkline">${generateSparkline(getDailySparklineData('ovenUsed', 14))}</span></pre>
       </div>
     </div>
 
@@ -849,7 +945,6 @@ export function generateWeeklyReport(data, history) {
 
   // Sparklines
   const waterSparkline = generateSparkline(getSparklineData('waterGallons', 12));
-  const energySparkline = generateSparkline(getSparklineData('energyKwh', 12));
   const laundrySparkline = generateSparkline(getSparklineData('washerCycles', 12));
 
   // Changes
@@ -857,13 +952,8 @@ export function generateWeeklyReport(data, history) {
   const waterVs4 = avg4Week ? formatChangeArrow(thisWeek?.waterGallons || 0, avg4Week.waterGallons) : '';
   const waterVs12 = avg12Week ? formatChangeArrow(thisWeek?.waterGallons || 0, avg12Week.waterGallons) : '';
 
-  const energyVsLast = lastWeek ? formatChangeArrow(thisWeek?.energyKwh || 0, lastWeek.energyKwh) : '';
-  const energyVs4 = avg4Week ? formatChangeArrow(thisWeek?.energyKwh || 0, avg4Week.energyKwh) : '';
-  const energyVs12 = avg12Week ? formatChangeArrow(thisWeek?.energyKwh || 0, avg12Week.energyKwh) : '';
-
-  // Generate new sections
-  const solarSummaryHtml = generateWeeklySolarSummary(data, history);
-  const costSummaryHtml = generateWeeklyCostSummary(data, history);
+  // Generate sections
+  const energyCostHtml = generateWeeklyEnergyCost(data, history);
   const maintenanceForecastHtml = generateMaintenanceForecast(data, history);
 
   return `
@@ -884,9 +974,7 @@ export function generateWeeklyReport(data, history) {
       📋 ${summary}
     </div>
 
-    ${solarSummaryHtml}
-
-    ${costSummaryHtml}
+    ${energyCostHtml}
 
     <div class="section">
       <div class="section-title">💧 WATER USAGE</div>
@@ -899,15 +987,6 @@ vs 4-Week Avg:     ${waterVs4 || 'N/A'} ${avg4Week ? `(${avg4Week.waterGallons.t
 vs 12-Week Avg:    ${waterVs12 || 'N/A'} ${avg12Week ? `(${avg12Week.waterGallons.toFixed(0)} gal)` : ''}
 
 12-Week Trend:     <span class="sparkline">${waterSparkline}</span></pre>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-title">🚿 WATER HEATER</div>
-      <div class="box">
-<pre>Current Mode:      ${data.waterHeater?.modeName || 'Unknown'}
-Set Point:         ${data.waterHeater?.temperatureSetpoint || 'N/A'}°F
-Status:            ${data.waterHeater?.isOnline ? 'Online' : 'Offline'}</pre>
       </div>
     </div>
 
@@ -929,7 +1008,9 @@ vs 12-Week Avg:    ${avg12Week ? formatChangeArrow(thisWeek?.washerCycles || 0, 
 <pre>This Week:         ${thisWeek?.saunaSessions || 0} sessions
 vs Last Week:      ${lastWeek ? formatChangeArrow(thisWeek?.saunaSessions || 0, lastWeek.saunaSessions) : 'N/A'} ${lastWeek ? `(${lastWeek.saunaSessions} sessions)` : ''}
 vs 4-Week Avg:     ${avg4Week ? formatChangeArrow(thisWeek?.saunaSessions || 0, avg4Week.saunaSessions) : 'N/A'} ${avg4Week ? `(${avg4Week.saunaSessions.toFixed(1)} sessions)` : ''}
-vs 12-Week Avg:    ${avg12Week ? formatChangeArrow(thisWeek?.saunaSessions || 0, avg12Week.saunaSessions) : 'N/A'} ${avg12Week ? `(${avg12Week.saunaSessions.toFixed(1)} sessions)` : ''}</pre>
+vs 12-Week Avg:    ${avg12Week ? formatChangeArrow(thisWeek?.saunaSessions || 0, avg12Week.saunaSessions) : 'N/A'} ${avg12Week ? `(${avg12Week.saunaSessions.toFixed(1)} sessions)` : ''}
+
+12-Week Trend:     <span class="sparkline">${generateSparkline(getSparklineData('saunaSessions', 12))}</span></pre>
       </div>
     </div>
 
@@ -939,7 +1020,9 @@ vs 12-Week Avg:    ${avg12Week ? formatChangeArrow(thisWeek?.saunaSessions || 0,
 <pre>This Week:         ${thisWeek?.ovenUses || 0} uses
 vs Last Week:      ${lastWeek ? formatChangeArrow(thisWeek?.ovenUses || 0, lastWeek.ovenUses) : 'N/A'} ${lastWeek ? `(${lastWeek.ovenUses} uses)` : ''}
 vs 4-Week Avg:     ${avg4Week ? formatChangeArrow(thisWeek?.ovenUses || 0, avg4Week.ovenUses) : 'N/A'} ${avg4Week ? `(${avg4Week.ovenUses.toFixed(1)} uses)` : ''}
-vs 12-Week Avg:    ${avg12Week ? formatChangeArrow(thisWeek?.ovenUses || 0, avg12Week.ovenUses) : 'N/A'} ${avg12Week ? `(${avg12Week.ovenUses.toFixed(1)} uses)` : ''}</pre>
+vs 12-Week Avg:    ${avg12Week ? formatChangeArrow(thisWeek?.ovenUses || 0, avg12Week.ovenUses) : 'N/A'} ${avg12Week ? `(${avg12Week.ovenUses.toFixed(1)} uses)` : ''}
+
+12-Week Trend:     <span class="sparkline">${generateSparkline(getSparklineData('ovenUses', 12))}</span></pre>
       </div>
     </div>
 
@@ -951,7 +1034,9 @@ ${(data.smartLocks?.locks || []).map(lock => `${lock.name}: ${lock.isConnected ?
 
 This Week's Activity:
   Total Locks:     ${thisWeek?.lockEvents || data.smartLocks?.todayLocks || 0}${lastWeek?.lockEvents ? ` (vs ${lastWeek.lockEvents} last week)` : ''}
-  Total Unlocks:   ${thisWeek?.unlockEvents || data.smartLocks?.todayUnlocks || 0}${lastWeek?.unlockEvents ? ` (vs ${lastWeek.unlockEvents} last week)` : ''}</pre>
+  Total Unlocks:   ${thisWeek?.unlockEvents || data.smartLocks?.todayUnlocks || 0}${lastWeek?.unlockEvents ? ` (vs ${lastWeek.unlockEvents} last week)` : ''}
+
+12-Week Unlocks:   <span class="sparkline">${generateSparkline(getSparklineData('unlockEvents', 12))}</span></pre>
       </div>
     </div>
 
