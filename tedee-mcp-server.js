@@ -57,20 +57,75 @@ const DOOR_STATES = {
   3: 'NotFullyClosed',
 };
 
-// Activity event types
+// Activity event types (updated per Tedee API v1.32 docs)
 const EVENT_TYPES = {
-  1: 'Lock',
-  2: 'Unlock',
-  3: 'Pull',
-  4: 'Open',
-  5: 'Close',
-  6: 'Calibration',
-  7: 'DoorOpen',
-  8: 'DoorClose',
-  9: 'SemiLock',
+  32: 'Lock',           // LockedRemote (via app)
+  33: 'Unlock',         // UnlockedRemote (via app)
+  34: 'Lock',           // LockedButton
+  35: 'Unlock',         // UnlockedButton
+  36: 'Lock',           // LockedAuto
+  37: 'Unlock',         // UnlockedAuto
+  38: 'Lock',           // LockedManual
+  39: 'Unlock',         // UnlockedManual
+  40: 'Jammed',
+  41: 'PowerOff',
+  42: 'PowerOn',
+  43: 'Calibration',
+  46: 'BatteryCharging',
+  47: 'SemiLock',       // PartiallyOpenManual
+  48: 'SemiLock',       // PartiallyOpenButton
+  49: 'SemiLock',       // PartiallyOpenAuto
+  50: 'BatteryStopCharging',
+  51: 'Pull',           // PulledRemote
+  52: 'Pull',           // PulledAuto
+  53: 'Pull',           // PulledManual
+  54: 'SemiLock',       // PartiallyOpenRemote
+  55: 'Pull',           // PulledAutoByRemote
+  56: 'Lock',           // PostponedLock
+  57: 'Unlock',         // UnlockedHomeKit
+  58: 'SemiLock',       // PartiallyOpenHomeKit
+  59: 'Lock',           // LockedHomeKit
+  60: 'Pull',           // PulledHomeKit
+  61: 'Unlock',         // UnlockByPin
+  65: 'Lock',           // LockedByKeypadWithPin
+  66: 'Lock',           // LockedByKeypadWithoutPin
+  67: 'Unlock',         // LockForceUnlocked
+  77: 'Unlock',         // UnlockedByFingerprint
+  83: 'DoorOpen',
+  84: 'DoorClose',
+  88: 'Unlock',         // UnlockedByMatter
+  90: 'Lock',           // LockedByMatter
+  226: 'Lock',          // LockedByAccessLink
+  227: 'Lock',          // LockedByBridgeApi
+  228: 'Unlock',        // UnlockedByAccessLink
+  229: 'Unlock',        // UnlockedByBridgeApi
 };
 
-// Activity source types
+// Lock/unlock event codes for counting
+const LOCK_EVENT_CODES = [32, 34, 36, 38, 56, 59, 65, 66, 90, 226, 227];
+const UNLOCK_EVENT_CODES = [33, 35, 37, 39, 57, 61, 67, 77, 88, 228, 229];
+
+// Source type mapping from event codes
+function getSourceFromEvent(eventCode) {
+  const REMOTE_EVENTS = [32, 33, 51, 54];
+  const BUTTON_EVENTS = [34, 35, 48];
+  const AUTO_EVENTS = [36, 37, 49, 52, 55];
+  const MANUAL_EVENTS = [38, 39, 47, 53];
+  const HOMEKIT_EVENTS = [57, 58, 59, 60];
+  const KEYPAD_EVENTS = [61, 62, 63, 64, 65, 66];
+  const MATTER_EVENTS = [88, 89, 90, 91, 92, 93];
+
+  if (REMOTE_EVENTS.includes(eventCode)) return 'App';
+  if (BUTTON_EVENTS.includes(eventCode)) return 'Button';
+  if (AUTO_EVENTS.includes(eventCode)) return eventCode % 2 === 0 ? 'AutoLock' : 'AutoUnlock';
+  if (MANUAL_EVENTS.includes(eventCode)) return 'Manual';
+  if (HOMEKIT_EVENTS.includes(eventCode)) return 'HomeKit';
+  if (KEYPAD_EVENTS.includes(eventCode)) return 'Keypad';
+  if (MATTER_EVENTS.includes(eventCode)) return 'Matter';
+  return 'Unknown';
+}
+
+// Activity source types (legacy, kept for reference)
 const SOURCE_TYPES = {
   0: 'Unknown',
   1: 'Manual',
@@ -443,15 +498,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           date: activity.date,
           event: formatEventType(activity.event),
           event_code: activity.event,
-          source: formatSourceType(activity.source),
+          source: getSourceFromEvent(activity.event),
           source_code: activity.source,
           user_name: activity.username || 'Unknown',
           user_id: activity.userId,
         }));
 
-        // Count locks and unlocks
-        const lockCount = activities.filter(a => a.event_code === 1).length;
-        const unlockCount = activities.filter(a => a.event_code === 2).length;
+        // Count locks and unlocks using new event code sets
+        const lockCount = activities.filter(a => LOCK_EVENT_CODES.includes(a.event_code)).length;
+        const unlockCount = activities.filter(a => UNLOCK_EVENT_CODES.includes(a.event_code)).length;
 
         return {
           content: [
