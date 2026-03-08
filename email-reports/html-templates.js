@@ -294,7 +294,7 @@ Monthly Projection: $${monthlyProjection.toFixed(2)}</pre>
   const avg4WeekGridImport = avg4Week?.gridImport || 0;
   const avg4WeekGridExport = avg4Week?.gridExport || 0;
   const avg4WeekNetCost = (avg4WeekGridImport - avg4WeekGridExport) * costConfig.electricityCostPerKwh;
-  const lastMonthProj = avg4WeekNetCost * costConfig.projectionDaysInMonth;
+  const lastMonthProj = (avg4WeekNetCost / 7) * costConfig.projectionDaysInMonth;
   const savingsVsLastMonth = lastMonthProj - monthlyProjection;
   const savingsPct = lastMonthProj !== 0 ? (savingsVsLastMonth / Math.abs(lastMonthProj)) * 100 : 0;
 
@@ -308,8 +308,7 @@ Monthly Projection: $${monthlyProjection.toFixed(2)}</pre>
   const whBreakout = whKwh > 0 ? `
 Water Heater Breakout:
   Water Heater:     ${whKwh.toFixed(1)} kWh  (${whPct.toFixed(0)}% of home)
-  Rest of House:    ${restOfHouseKwh.toFixed(1)} kWh  (${restOfHousePct.toFixed(0)}% of home)
-  Mode: ${whMode} ${(whMode === 'HEAT_PUMP' || whMode === 'Heat Pump') ? '(most efficient) ✓' : whModeCheck}` : '';
+  Rest of House:    ${restOfHouseKwh.toFixed(1)} kWh  (${restOfHousePct.toFixed(0)}% of home)` : '';
 
   return `
     <div class="section">
@@ -813,8 +812,8 @@ export function generateDailyReport(data, history) {
     <div class="section">
       <div class="section-title">💧 WATER USAGE</div>
       <div class="box">
-<pre>Yesterday:          ${(data.water?.dailyConsumption || 0).toFixed(1)} gal
-vs Day Before:      ${waterVsYesterday || 'N/A'} ${yesterday ? `(${yesterday.waterGallons.toFixed(1)} gal)` : ''}
+<pre>Today:              ${(data.water?.todayConsumption || 0).toFixed(1)} gal
+vs Yesterday:       ${data.water?.dailyConsumption ? formatChangeArrow(data.water?.todayConsumption || 0, data.water.dailyConsumption) : 'N/A'} ${data.water?.dailyConsumption ? `(${data.water.dailyConsumption.toFixed(1)} gal)` : ''}
 vs 7-Day Avg:       ${waterVs7Day || 'N/A'} ${avg7Day ? `(${avg7Day.waterGallons.toFixed(1)} gal)` : ''}
 
 Week-to-date:       ${(weekToDate?.waterGallons || 0).toFixed(0)} gal
@@ -828,7 +827,6 @@ System Status:
   Flow Rate:        ${data.water?.flow?.toFixed(1) || '0.0'} GPM  ${data.water?.flow > 0 ? '(active usage)' : '(no active usage)'}
   Main Valve:       ${data.water?.valveStatus || 'Unknown'}
   Auto-Shutoff:     ${data.water?.autoShutoff ? 'Enabled ✓' : 'Disabled'}
-  WiFi Signal:      ${data.water?.signalStrength ? `${data.water.signalStrength} dBm ${data.water.signalStrength > -50 ? '(excellent)' : data.water.signalStrength > -70 ? '(good)' : '(weak)'}` : 'N/A'}
 
 14-Day Trend:       <span class="sparkline">${generateSparkline(getDailySparklineData('waterGallons', 14))}</span>${data.water?.fixtureBreakdown && data.water.fixtureBreakdown.length > 0 ? `
 
@@ -844,7 +842,6 @@ Fixture Breakdown (Yesterday):${data.water.fixtureBreakdown.map(f => `
 Mode:               ${data.waterHeater?.modeName || data.waterHeater?.operationMode || 'Unknown'} ${(data.waterHeater?.modeName === 'HEAT_PUMP' || data.waterHeater?.modeName === 'Heat Pump') ? '(most efficient) ✓' : ''}
 Set Point:          ${data.waterHeater?.temperatureSetpoint || 'N/A'}°F
 Status:             ${data.waterHeater?.isOnline ? 'Online' : 'Offline'}
-Hot Water:          ${data.waterHeater?.hotWaterStatus || 'Unknown'}
 
 Weekly Energy:      ${(weekToDate?.energyKwh || 0).toFixed(1)} kWh  ($${((weekToDate?.energyKwh || 0) * costConfig.electricityCostPerKwh).toFixed(2)})
 Daily Average:      ${(avg7Day?.energyKwh || 0).toFixed(1)} kWh/day  ($${((avg7Day?.energyKwh || 0) * costConfig.electricityCostPerKwh).toFixed(2)}/day)

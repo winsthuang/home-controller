@@ -349,8 +349,13 @@ async function collectPhynData() {
     const consumptionResponse = await callTool(server, responses, 'get_consumption',
       { device_id: deviceIds.phyn.phynPlus, duration: yesterdayStr }, 41);
 
-    // Get monthly consumption
+    // Get TODAY's consumption (partial day, for display)
     const today = new Date();
+    const todayStr = `${today.getFullYear()}/${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getDate()).padStart(2, '0')}`;
+    const todayConsumptionResponse = await callTool(server, responses, 'get_consumption',
+      { device_id: deviceIds.phyn.phynPlus, duration: todayStr }, 43);
+
+    // Get monthly consumption
     const monthStr = `${today.getFullYear()}/${String(today.getMonth() + 1).padStart(2, '0')}`;
     const monthlyResponse = await callTool(server, responses, 'get_consumption',
       { device_id: deviceIds.phyn.phynPlus, duration: monthStr }, 42);
@@ -359,6 +364,7 @@ async function collectPhynData() {
 
     let statusData = {};
     let dailyConsumption = 0;
+    let todayConsumption = 0;
     let monthlyConsumption = 0;
     let fixtureBreakdown = null;
 
@@ -380,6 +386,13 @@ async function collectPhynData() {
       } catch (e) {}
     }
 
+    if (todayConsumptionResponse?.result?.content?.[0]?.text) {
+      try {
+        const data = JSON.parse(todayConsumptionResponse.result.content[0].text);
+        todayConsumption = data.water_consumption || 0;
+      } catch (e) {}
+    }
+
     if (monthlyResponse?.result?.content?.[0]?.text) {
       try {
         const data = JSON.parse(monthlyResponse.result.content[0].text);
@@ -397,6 +410,7 @@ async function collectPhynData() {
       signalStrength: statusData.signal_strength || null,
       autoShutoff: statusData.auto_shutoff_enable || false,
       dailyConsumption,
+      todayConsumption,
       monthlyConsumption,
       fixtureBreakdown: fixtureBreakdown  // NEW: Fixture-level data
     };
@@ -872,6 +886,7 @@ export async function collectAllData() {
       signalStrength: phynData.signalStrength,
       autoShutoff: phynData.autoShutoff,
       dailyConsumption: phynData.dailyConsumption,
+      todayConsumption: phynData.todayConsumption,
       monthlyConsumption: phynData.monthlyConsumption,
       fixtureBreakdown: phynData.fixtureBreakdown  // NEW
     },
