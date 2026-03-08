@@ -412,7 +412,7 @@ async function collectPhynData() {
 async function collectAOSmithData(retryCount = 0) {
   const MAX_RETRIES = 1;
   const RETRY_DELAY_MS = 5000;
-  const TIMEOUT_MS = 20000; // Increased timeout for GraphQL API
+  const TIMEOUT_MS = 35000; // Cover login + get_devices sequential GraphQL calls
 
   try {
     console.error(`[AO Smith] Starting data collection (attempt ${retryCount + 1}/${MAX_RETRIES + 1})`);
