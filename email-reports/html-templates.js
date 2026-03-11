@@ -2,7 +2,7 @@
 // Simple, text-focused format matching the approved mockups
 
 import {
-  getYesterday, get7DayAverage, getWeeklyStats, get4WeekAverage,
+  getToday, getYesterday, get7DayAverage, getWeeklyStats, get4WeekAverage,
   get12WeekAverage, getWeekToDate, getDailySparklineData, getSparklineData,
   generateSparkline, percentChange, calculateBatteryDischargeRate
 } from './history-store.js';
@@ -191,6 +191,7 @@ Home Consumption:   ${tesla.homeConsumption.toFixed(1)} kWh
 Self-Powered:       ${tesla.historySelfPowered || tesla.selfPoweredPercentage || 'N/A'}%
 
 14-Day Solar:       <span class="sparkline">${generateSparkline(getDailySparklineData('solarProduction', 14))}</span>
+${generate7DayPattern('solarProduction', '7-Day Solar Pattern', 'kWh', costConfig.solarValuePerKwh)}
 
 Current Status:
   Solar:            ${formatPower(tesla.solarPower)} ${tesla.solarPower > 0 ? '☀️' : '🌙'}
@@ -314,7 +315,7 @@ Water Heater Breakout:
     <div class="section">
       <div class="section-title">💰 ENERGY COST SNAPSHOT</div>
       <div class="box">
-<pre>Yesterday's Whole-Home Electricity:
+<pre>Today's Whole-Home Electricity:
   Home Consumption: ${homeConsumption.toFixed(1)} kWh
   Grid Import:      ${gridImport.toFixed(1)} kWh  ($${gridCost.toFixed(2)})
   Solar Offset:     ${solarOffset.toFixed(1)} kWh  ($${solarAvoided.toFixed(2)} avoided)
@@ -323,6 +324,7 @@ Water Heater Breakout:
 ${whBreakout}
 
 14-Day Trend:   <span class="sparkline">${homeSparkline}</span>  ${homeAvgLabel}
+${generate7DayPattern('homeConsumption', '7-Day Home Energy Pattern', 'kWh', costConfig.electricityCostPerKwh)}
 
 Week-to-date:       ${weekHomeKwh.toFixed(1)} kWh  (${formatCost(weekNetCost)} net)
 Daily Avg (7d):     ${dailyAvgHomeKwh.toFixed(1)} kWh/day  (${formatCost(avg7DayNetCost)}/day)
@@ -381,38 +383,60 @@ function generateMaintenanceAlertsSection(alerts) {
 }
 
 /**
- * Generate 7-day energy pattern visualization
+ * Generic 7-day pattern visualization
+ * @param {string} metric - history store metric key
+ * @param {string} label - section label (e.g. "7-Day Energy Pattern")
+ * @param {string} unit - unit label (e.g. "kWh", "gal")
+ * @param {number|null} costPerUnit - cost per unit for peak/lowest display, or null to omit cost
  */
-function generate7DayEnergyPattern(data, history) {
-  const sparklineData = getDailySparklineData('energyKwh', 7);
+function generate7DayPattern(metric, label, unit, costPerUnit) {
+  const sparklineData = getDailySparklineData(metric, 7);
   const sparkline = generateSparkline(sparklineData);
 
-  // Get day labels (Mon, Tue, etc.)
+  // Smart formatting: round to whole number if >= 10, keep 1 decimal if < 10
+  const fmt = (v) => v >= 10 ? Math.round(v).toString() : v.toFixed(1);
+
   const days = [];
-  const values = [];
+  const formattedValues = [];
   for (let i = 6; i >= 0; i--) {
     const date = new Date();
     date.setDate(date.getDate() - i);
     days.push(date.toLocaleDateString('en-US', { weekday: 'short' }).substring(0, 3));
-    values.push(sparklineData[6 - i]?.toFixed(1) || '0.0');
+    formattedValues.push(fmt(sparklineData[6 - i] || 0));
   }
 
+  // Dynamic column width: fit the widest value, min 3 for day labels
+  const colWidth = Math.max(3, ...formattedValues.map(v => v.length));
+  const pad = (s) => s.padStart(Math.ceil((colWidth - s.length) / 2) + s.length).padEnd(colWidth);
+  const gap = '  ';
+
+  const dayRow = days.map(d => pad(d)).join(gap);
+  const sparkRow = sparkline.split('').map(c => pad(c)).join(gap);
+  const valRow = formattedValues.map(v => pad(v)).join(gap);
+
   const maxValue = Math.max(...sparklineData);
-  const minValue = Math.min(...sparklineData.filter(v => v > 0));
+  const positiveData = sparklineData.filter(v => v > 0);
+  const minValue = positiveData.length > 0 ? Math.min(...positiveData) : 0;
   const maxDay = days[sparklineData.indexOf(maxValue)];
   const minDay = days[sparklineData.indexOf(minValue)];
 
-  // Space sparkline chars to align with day labels and values (5-char columns)
-  const spacedSparkline = sparkline.split('').map(c => ` ${c} `).join('  ');
+  const costStr = (val) => costPerUnit ? `, $${(val * costPerUnit).toFixed(2)}` : '';
 
   return `
-7-Day Energy Pattern:
-  ${days.join('  ')}
-  ${spacedSparkline}
-  ${values.join('  ')} kWh
+${label}:
+  ${dayRow}
+  ${sparkRow}
+  ${valRow} ${unit}
 
-Peak Usage:         ${maxDay} (${maxValue.toFixed(1)} kWh, $${(maxValue * costConfig.electricityCostPerKwh).toFixed(2)})
-Lowest Usage:       ${minDay} (${minValue.toFixed(1)} kWh, $${(minValue * costConfig.electricityCostPerKwh).toFixed(2)})`;
+Peak:               ${maxDay} (${fmt(maxValue)} ${unit}${costStr(maxValue)})
+Lowest:             ${minDay} (${fmt(minValue)} ${unit}${costStr(minValue)})`;
+}
+
+/**
+ * Generate 7-day energy pattern visualization (water heater)
+ */
+function generate7DayEnergyPattern(data, history) {
+  return generate7DayPattern('energyKwh', '7-Day Energy Pattern', 'kWh', costConfig.electricityCostPerKwh);
 }
 
 /**
@@ -749,6 +773,7 @@ const STYLES = `
  * Generate daily report HTML - simple, usage-focused format
  */
 export function generateDailyReport(data, history) {
+  const today = getToday();
   const yesterday = getYesterday();
   const avg7Day = get7DayAverage();
   const weekToDate = getWeekToDate();
@@ -828,7 +853,8 @@ System Status:
   Main Valve:       ${data.water?.valveStatus || 'Unknown'}
   Auto-Shutoff:     ${data.water?.autoShutoff ? 'Enabled ✓' : 'Disabled'}
 
-14-Day Trend:       <span class="sparkline">${generateSparkline(getDailySparklineData('waterGallons', 14))}</span>${data.water?.fixtureBreakdown && data.water.fixtureBreakdown.length > 0 ? `
+14-Day Trend:       <span class="sparkline">${generateSparkline(getDailySparklineData('waterGallons', 14))}</span>
+${generate7DayPattern('waterGallons', '7-Day Water Pattern', 'gal', null)}${data.water?.fixtureBreakdown && data.water.fixtureBreakdown.length > 0 ? `
 
 Fixture Breakdown (Yesterday):${data.water.fixtureBreakdown.map(f => `
   ${f.name}:${' '.repeat(Math.max(1, 18 - f.name.length))}${f.gallons.toFixed(1)} gal  (${f.percentage}%)  ${'▂'.repeat(Math.max(1, Math.floor(f.percentage / 5)))}`).join('')}` : ''}</pre>
@@ -838,7 +864,7 @@ Fixture Breakdown (Yesterday):${data.water.fixtureBreakdown.map(f => `
     <div class="section">
       <div class="section-title">🚿 WATER HEATER ENERGY</div>
       <div class="box">
-<pre>Yesterday:          ${(data.waterHeater?.dailyUsage || 0).toFixed(1)} kWh  ($${((data.waterHeater?.dailyUsage || 0) * costConfig.electricityCostPerKwh).toFixed(2)})
+<pre>Today:              ${(data.waterHeater?.dailyUsage || 0).toFixed(1)} kWh  ($${((data.waterHeater?.dailyUsage || 0) * costConfig.electricityCostPerKwh).toFixed(2)})
 Mode:               ${data.waterHeater?.modeName || data.waterHeater?.operationMode || 'Unknown'} ${(data.waterHeater?.modeName === 'HEAT_PUMP' || data.waterHeater?.modeName === 'Heat Pump') ? '(most efficient) ✓' : ''}
 Set Point:          ${data.waterHeater?.temperatureSetpoint || 'N/A'}°F
 Status:             ${data.waterHeater?.isOnline ? 'Online' : 'Offline'}
@@ -856,7 +882,7 @@ ${generate7DayEnergyPattern(data, history)}</pre>
       <div class="section-title">🧺 LAUNDRY</div>
       <div class="box">
 <pre>Week-to-date:      ${weekToDate?.washerCycles || 0} wash cycles
-Yesterday:         ${yesterday ? (yesterday.washerCycles || 0) + ' cycles' : 'N/A'}
+Today:             ${today ? (today.washerCycles || 0) + ' cycles' : 'N/A'}
 7-Day Avg:         ${avg7Day ? (avg7Day.washerCycles).toFixed(1) + ' cycles/day' : 'N/A'}
 
 14-Day Trend:      <span class="sparkline">${generateSparkline(getDailySparklineData('washerCycles', 14))}</span></pre>
@@ -867,7 +893,7 @@ Yesterday:         ${yesterday ? (yesterday.washerCycles || 0) + ' cycles' : 'N/
       <div class="section-title">🧖 SAUNA</div>
       <div class="box">
 <pre>Week-to-date:      ${weekToDate?.saunaSessions || 0} sessions
-Yesterday:         ${yesterday ? (yesterday.saunaUsed ? '1' : '0') + ' session' : 'N/A'}
+Today:             ${today ? (today.saunaUsed ? '1' : '0') + ' session' : 'N/A'}
 7-Day Avg:         ${avg7Day ? (avg7Day.saunaSessions).toFixed(1) + ' sessions/day' : 'N/A'}
 
 14-Day Trend:      <span class="sparkline">${generateSparkline(getDailySparklineData('saunaUsed', 14))}</span></pre>
@@ -878,7 +904,7 @@ Yesterday:         ${yesterday ? (yesterday.saunaUsed ? '1' : '0') + ' session' 
       <div class="section-title">🍳 KITCHEN</div>
       <div class="box">
 <pre>Week-to-date:      ${weekToDate?.ovenUses || 0} uses
-Yesterday:         ${yesterday ? (yesterday.ovenUsed ? '1' : '0') + ' use' : 'N/A'}
+Today:             ${today ? (today.ovenUsed ? '1' : '0') + ' use' : 'N/A'}
 7-Day Avg:         ${avg7Day ? (avg7Day.ovenUses).toFixed(1) + ' uses/day' : 'N/A'}
 
 14-Day Trend:      <span class="sparkline">${generateSparkline(getDailySparklineData('ovenUsed', 14))}</span></pre>
@@ -897,18 +923,32 @@ Yesterday:         ${yesterday ? (yesterday.ovenUsed ? '1' : '0') + ' use' : 'N/
 }).join('\n\n') || 'No locks configured'}
 
 Today's Activity (Past 24h):
-  Total Unlocks:    ${data.smartLocks?.todayUnlocks || 0} events${data.smartLocks?.activityBreakdown ? `
-    • Manual:       ${data.smartLocks.activityBreakdown.unlocksBySource.manual || 0}
-    • App:          ${data.smartLocks.activityBreakdown.unlocksBySource.app || 0}
-    • Auto-unlock:  ${data.smartLocks.activityBreakdown.unlocksBySource.autoUnlock || 0}` : ''}
+  Total Unlocks:    ${data.smartLocks?.todayUnlocks || 0} events${data.smartLocks?.activityBreakdown ? (() => {
+    const u = data.smartLocks.activityBreakdown.unlocksBySource;
+    const sources = [
+      u.manual && `Manual: ${u.manual}`,
+      u.fingerprint && `Fingerprint: ${u.fingerprint}`,
+      u.keypad && `Keypad: ${u.keypad}`,
+      u.app && `App: ${u.app}`,
+      u.homeKit && `HomeKit: ${u.homeKit}`,
+      u.autoUnlock && `Auto: ${u.autoUnlock}`,
+      u.matter && `Matter: ${u.matter}`,
+    ].filter(Boolean);
+    return sources.length ? '\n    • ' + sources.join('\n    • ') : '';
+  })() : ''}
 
-  Total Locks:      ${data.smartLocks?.todayLocks || 0} events${data.smartLocks?.activityBreakdown ? `
-    • Manual:       ${data.smartLocks.activityBreakdown.locksBySource.manual || 0}
-    • Auto-lock:    ${data.smartLocks.activityBreakdown.locksBySource.autoLock || 0}` : ''}${data.smartLocks?.todayLocks > 0 ? `
-
-Security Score:     ${Math.round((data.smartLocks.activityBreakdown?.locksBySource?.autoLock || 0) / data.smartLocks.todayLocks * 100)}% auto-lock rate ${(data.smartLocks.activityBreakdown?.locksBySource?.autoLock || 0) / data.smartLocks.todayLocks >= 0.8 ? '(good practice)' : '(consider enabling auto-lock)'}` : ''}
-
-Unusual Activity:   None detected</pre>
+  Total Locks:      ${data.smartLocks?.todayLocks || 0} events${data.smartLocks?.activityBreakdown ? (() => {
+    const l = data.smartLocks.activityBreakdown.locksBySource;
+    const sources = [
+      l.manual && `Manual: ${l.manual}`,
+      l.keypad && `Keypad: ${l.keypad}`,
+      l.app && `App: ${l.app}`,
+      l.homeKit && `HomeKit: ${l.homeKit}`,
+      l.autoLock && `Auto: ${l.autoLock}`,
+      l.matter && `Matter: ${l.matter}`,
+    ].filter(Boolean);
+    return sources.length ? '\n    • ' + sources.join('\n    • ') : '';
+  })() : ''}</pre>
       </div>
     </div>
 
@@ -1026,12 +1066,29 @@ vs 12-Week Avg:    ${avg12Week ? formatChangeArrow(thisWeek?.ovenUses || 0, avg1
     <div class="section">
       <div class="section-title">🔐 SMART LOCKS</div>
       <div class="box">
-<pre>Locks Connected:   ${data.smartLocks?.lockCount || 0}
-${(data.smartLocks?.locks || []).map(lock => `${lock.name}: ${lock.isConnected ? lock.lockState : 'Offline'}${lock.batteryLevel ? ` (${lock.batteryLevel}%)` : ''}`).join('\n') || 'No locks configured'}
+<pre>${(data.smartLocks?.locks || []).map(lock => {
+  const dischargeRate = calculateBatteryDischargeRate(lock.id, history);
+  const weeksLeft = Math.floor(lock.batteryLevel / dischargeRate);
+  return `${lock.name}: ${lock.isConnected ? 'Online ✓' : 'Offline ⚠️'}
+  Battery:         ${lock.batteryLevel}%  (−${dischargeRate.toFixed(1)}%/wk → ~${weeksLeft} weeks)`;
+}).join('\n') || 'No locks configured'}
 
 This Week's Activity:
   Total Locks:     ${thisWeek?.lockEvents || data.smartLocks?.todayLocks || 0}${lastWeek?.lockEvents ? ` (vs ${lastWeek.lockEvents} last week)` : ''}
-  Total Unlocks:   ${thisWeek?.unlockEvents || data.smartLocks?.todayUnlocks || 0}${lastWeek?.unlockEvents ? ` (vs ${lastWeek.unlockEvents} last week)` : ''}
+  Total Unlocks:   ${thisWeek?.unlockEvents || data.smartLocks?.todayUnlocks || 0}${lastWeek?.unlockEvents ? ` (vs ${lastWeek.unlockEvents} last week)` : ''}${data.smartLocks?.activityBreakdown ? (() => {
+    const u = data.smartLocks.activityBreakdown.unlocksBySource;
+    const total = data.smartLocks.todayUnlocks || 0;
+    if (!total) return '';
+    const sources = [
+      u.manual && `Manual ${u.manual}`,
+      u.fingerprint && `Fingerprint ${u.fingerprint}`,
+      u.keypad && `Keypad ${u.keypad}`,
+      u.homeKit && `HomeKit ${u.homeKit}`,
+      u.app && `App ${u.app}`,
+      u.autoUnlock && `Auto ${u.autoUnlock}`,
+    ].filter(Boolean);
+    return sources.length ? `\n  Today's Sources: ${sources.join(' · ')}` : '';
+  })() : ''}
 
 12-Week Unlocks:   <span class="sparkline">${generateSparkline(getSparklineData('unlockEvents', 12))}</span></pre>
       </div>

@@ -196,7 +196,7 @@ The test scripts implement proper JSON-RPC protocol and output device status. Us
 ### Tedee Smart Locks
 | Device | API | Access |
 |--------|-----|--------|
-| Smart Lock | api.tedee.com/api/v1.32 | Personal Access Key (PAK) |
+| Smart Lock | api.tedee.com/api/v1.36 | Personal Access Key (PAK) |
 
 **Status Fields (Tedee):**
 - `lockState` - Lock state: Locked (6), Unlocked (2), SemiLocked (3)

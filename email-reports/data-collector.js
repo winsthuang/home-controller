@@ -633,10 +633,13 @@ async function collectTeslaData(retryCount = 0) {
     const liveData = liveResult.data;
     const siteId = liveData.site_id;
 
-    // Get yesterday's energy history
+    // Get today's energy history (end_date = tomorrow returns data FOR today)
     console.error('[Tesla] Requesting energy history...');
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const endDate = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
     const historyResponse = await callTool(server, responses, 'get_energy_history',
-      { site_id: siteId, period: 'day' }, 71, TIMEOUT_MS);
+      { site_id: siteId, period: 'day', end_date: endDate }, 71, TIMEOUT_MS);
 
     let historyData = null;
     if (historyResponse) {
@@ -748,8 +751,8 @@ async function collectTedeeData() {
 
     // Activity breakdown by source
     const activityBreakdown = {
-      locksBySource: { manual: 0, app: 0, autoLock: 0 },
-      unlocksBySource: { manual: 0, app: 0, autoUnlock: 0 }
+      locksBySource: { manual: 0, app: 0, autoLock: 0, keypad: 0, homeKit: 0, matter: 0, accessLink: 0, bridgeApi: 0 },
+      unlocksBySource: { manual: 0, app: 0, autoUnlock: 0, keypad: 0, fingerprint: 0, homeKit: 0, matter: 0, accessLink: 0, bridgeApi: 0 }
     };
 
     for (let i = 0; i < locks.length; i++) {
@@ -766,42 +769,45 @@ async function collectTedeeData() {
           const oneDayAgo = new Date();
           oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
-          // New Tedee event codes (API v1.32+)
+          // Tedee event codes (API v1.36)
           const LOCK_CODES = [32, 34, 36, 38, 56, 59, 65, 66, 90, 226, 227];
-          const UNLOCK_CODES = [33, 35, 37, 39, 57, 61, 67, 77, 88, 228, 229];
-          const MANUAL_LOCK_CODES = [38, 47];
-          const MANUAL_UNLOCK_CODES = [39];
-          const APP_LOCK_CODES = [32];
-          const APP_UNLOCK_CODES = [33];
-          const AUTO_LOCK_CODES = [36, 49];
-          const AUTO_UNLOCK_CODES = [37, 55];
+          const UNLOCK_CODES = [33, 35, 37, 39, 57, 61, 67, 68, 77, 78, 88, 93, 228, 229];
+          // Source classification by event code
+          const SOURCE_MAP = {
+            // Locks
+            38: 'locksBySource.manual', 47: 'locksBySource.manual',
+            32: 'locksBySource.app',
+            36: 'locksBySource.autoLock', 49: 'locksBySource.autoLock', 56: 'locksBySource.autoLock',
+            65: 'locksBySource.keypad', 66: 'locksBySource.keypad',
+            59: 'locksBySource.homeKit',
+            90: 'locksBySource.matter',
+            226: 'locksBySource.accessLink',
+            227: 'locksBySource.bridgeApi',
+            // Unlocks
+            39: 'unlocksBySource.manual',
+            33: 'unlocksBySource.app',
+            37: 'unlocksBySource.autoUnlock', 55: 'unlocksBySource.autoUnlock',
+            61: 'unlocksBySource.keypad', 68: 'unlocksBySource.keypad',
+            77: 'unlocksBySource.fingerprint', 78: 'unlocksBySource.fingerprint',
+            57: 'unlocksBySource.homeKit',
+            88: 'unlocksBySource.matter', 93: 'unlocksBySource.matter',
+            228: 'unlocksBySource.accessLink',
+            229: 'unlocksBySource.bridgeApi',
+          };
 
           for (const activity of activities) {
             const activityDate = new Date(activity.date);
             if (activityDate >= oneDayAgo) {
               const ec = activity.event_code;
 
-              // Track event counts
               if (LOCK_CODES.includes(ec)) totalLocks++;
               if (UNLOCK_CODES.includes(ec)) totalUnlocks++;
 
-              // Track sources by event code (source is now embedded in event code)
-              if (LOCK_CODES.includes(ec)) {
-                if (MANUAL_LOCK_CODES.includes(ec)) {
-                  activityBreakdown.locksBySource.manual++;
-                } else if (APP_LOCK_CODES.includes(ec)) {
-                  activityBreakdown.locksBySource.app++;
-                } else if (AUTO_LOCK_CODES.includes(ec)) {
-                  activityBreakdown.locksBySource.autoLock++;
-                }
-              } else if (UNLOCK_CODES.includes(ec)) {
-                if (MANUAL_UNLOCK_CODES.includes(ec)) {
-                  activityBreakdown.unlocksBySource.manual++;
-                } else if (APP_UNLOCK_CODES.includes(ec)) {
-                  activityBreakdown.unlocksBySource.app++;
-                } else if (AUTO_UNLOCK_CODES.includes(ec)) {
-                  activityBreakdown.unlocksBySource.autoUnlock++;
-                }
+              // Track source from event code
+              const sourcePath = SOURCE_MAP[ec];
+              if (sourcePath) {
+                const [group, key] = sourcePath.split('.');
+                activityBreakdown[group][key]++;
               }
             }
           }

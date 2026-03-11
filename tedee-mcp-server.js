@@ -13,7 +13,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Tedee API configuration
-const TEDEE_API_BASE_URL = 'https://api.tedee.com/api/v1.32';
+const TEDEE_API_BASE_URL = 'https://api.tedee.com/api/v1.36';
 const TEDEE_API_KEY = process.env.TEDEE_API_KEY;
 
 // Validate credentials
@@ -57,7 +57,7 @@ const DOOR_STATES = {
   3: 'NotFullyClosed',
 };
 
-// Activity event types (updated per Tedee API v1.32 docs)
+// Activity event types (updated per Tedee API v1.36 docs)
 const EVENT_TYPES = {
   32: 'Lock',           // LockedRemote (via app)
   33: 'Unlock',         // UnlockedRemote (via app)
@@ -87,41 +87,73 @@ const EVENT_TYPES = {
   59: 'Lock',           // LockedHomeKit
   60: 'Pull',           // PulledHomeKit
   61: 'Unlock',         // UnlockByPin
+  62: 'IncorrectPin',
+  63: 'Pull',           // PullSpringByPin
+  64: 'SemiLock',       // PartiallyOpenByPin
   65: 'Lock',           // LockedByKeypadWithPin
   66: 'Lock',           // LockedByKeypadWithoutPin
   67: 'Unlock',         // LockForceUnlocked
+  68: 'Unlock',         // LockForceUnlockedByPin
+  74: 'Uncalibrated',   // LockUncalibrated
+  75: 'UnauthorizedPin',
+  76: 'Pull',           // PulledAutoByPin
   77: 'Unlock',         // UnlockedByFingerprint
+  78: 'Unlock',         // ForceUnlockedByFingerprint
+  79: 'SemiLock',       // PartiallyOpenByFingerprint
+  80: 'Pull',           // PulledByFingerprint
+  81: 'Pull',           // PulledAutoByFingerprint
   83: 'DoorOpen',
   84: 'DoorClose',
+  85: 'DoorSensorUncalibrated',
+  86: 'DoorOpenTooLong',
+  87: 'Pull',           // LockPulledByAutoUnlock
   88: 'Unlock',         // UnlockedByMatter
+  89: 'SemiLock',       // PartiallyOpenByMatter
   90: 'Lock',           // LockedByMatter
+  91: 'Pull',           // PullSpringByMatter
+  92: 'Pull',           // PullSpringAutoByMatter
+  93: 'Unlock',         // ForceUnlockedByMatter
+  224: 'FirmwareUpdate', // FirmwareUpdateByBridge
+  225: 'FirmwareUpdate', // FirmwareUpdateByMobile
   226: 'Lock',          // LockedByAccessLink
   227: 'Lock',          // LockedByBridgeApi
   228: 'Unlock',        // UnlockedByAccessLink
   229: 'Unlock',        // UnlockedByBridgeApi
+  230: 'Pull',          // PulledByAccessLink
+  231: 'Pull',          // PulledByBridgeApi
+  232: 'SemiLock',      // PartiallyOpenByAccessLink
+  233: 'SemiLock',      // PartiallyOpenByBridgeApi
+  234: 'Pull',          // PulledAutoByAccessLink
+  235: 'Pull',          // PulledAutoByBridgeApi
 };
 
 // Lock/unlock event codes for counting
 const LOCK_EVENT_CODES = [32, 34, 36, 38, 56, 59, 65, 66, 90, 226, 227];
-const UNLOCK_EVENT_CODES = [33, 35, 37, 39, 57, 61, 67, 77, 88, 228, 229];
+const UNLOCK_EVENT_CODES = [33, 35, 37, 39, 57, 61, 67, 68, 77, 78, 88, 93, 228, 229];
 
 // Source type mapping from event codes
 function getSourceFromEvent(eventCode) {
   const REMOTE_EVENTS = [32, 33, 51, 54];
   const BUTTON_EVENTS = [34, 35, 48];
-  const AUTO_EVENTS = [36, 37, 49, 52, 55];
+  const AUTO_EVENTS = [36, 37, 49, 52, 55, 76, 81, 87];
   const MANUAL_EVENTS = [38, 39, 47, 53];
   const HOMEKIT_EVENTS = [57, 58, 59, 60];
-  const KEYPAD_EVENTS = [61, 62, 63, 64, 65, 66];
+  const KEYPAD_EVENTS = [61, 62, 63, 64, 65, 66, 68, 75];
+  const FINGERPRINT_EVENTS = [77, 78, 79, 80];
   const MATTER_EVENTS = [88, 89, 90, 91, 92, 93];
+  const ACCESS_LINK_EVENTS = [226, 228, 230, 232, 234];
+  const BRIDGE_API_EVENTS = [227, 229, 231, 233, 235];
 
   if (REMOTE_EVENTS.includes(eventCode)) return 'App';
   if (BUTTON_EVENTS.includes(eventCode)) return 'Button';
-  if (AUTO_EVENTS.includes(eventCode)) return eventCode % 2 === 0 ? 'AutoLock' : 'AutoUnlock';
+  if (AUTO_EVENTS.includes(eventCode)) return 'Auto';
   if (MANUAL_EVENTS.includes(eventCode)) return 'Manual';
   if (HOMEKIT_EVENTS.includes(eventCode)) return 'HomeKit';
   if (KEYPAD_EVENTS.includes(eventCode)) return 'Keypad';
+  if (FINGERPRINT_EVENTS.includes(eventCode)) return 'Fingerprint';
   if (MATTER_EVENTS.includes(eventCode)) return 'Matter';
+  if (ACCESS_LINK_EVENTS.includes(eventCode)) return 'AccessLink';
+  if (BRIDGE_API_EVENTS.includes(eventCode)) return 'BridgeAPI';
   return 'Unknown';
 }
 
@@ -333,8 +365,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           throw new Error(`Lock not found with ID: ${lock_id}`);
         }
 
-        // Properties are in lockProperties for sync endpoint
-        const props = lock.lockProperties || {};
+        // Properties are in deviceState for sync endpoint
+        const props = lock.deviceState || {};
 
         const status = {
           id: lock.id,
@@ -367,7 +399,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const response = await tedeeApi.get('/my/lock/sync');
 
         const locks = (response.data.result || []).map(lock => {
-          const props = lock.lockProperties || {};
+          const props = lock.deviceState || {};
           return {
             id: lock.id,
             name: lock.name,

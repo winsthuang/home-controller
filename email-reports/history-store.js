@@ -6,13 +6,90 @@ import { dirname } from 'path';
 import { paths, historySettings } from './config.js';
 
 /**
+ * Format a Date as YYYY-MM-DD in local timezone (avoids UTC date shift)
+ */
+function localDateStr(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Get the Eastern Time date string for a given ISO timestamp.
+ * Uses Intl.DateTimeFormat to handle EST/EDT automatically.
+ */
+function getETDate(timestamp) {
+  const ts = new Date(timestamp);
+  const etParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(ts);
+  const y = etParts.find(p => p.type === 'year').value;
+  const m = etParts.find(p => p.type === 'month').value;
+  const d = etParts.find(p => p.type === 'day').value;
+  return `${y}-${m}-${d}`;
+}
+
+/**
  * Load history from file
  */
 export function loadHistory() {
   try {
     if (existsSync(paths.historyFile)) {
       const data = readFileSync(paths.historyFile, 'utf8');
-      return JSON.parse(data);
+      const history = JSON.parse(data);
+
+      // V1 migration: recompute dates from timestamps using ET timezone.
+      // Prior to this fix, dates were stored using UTC (toISOString) which
+      // produced wrong dates for 10pm ET runs (where UTC date = next day).
+      if (!history._migratedToLocalDates && history.dailyStats?.length > 0) {
+        console.error('[Migration v1] Recomputing dates from timestamps (UTC → ET)');
+        for (const entry of history.dailyStats) {
+          entry.date = getETDate(entry.timestamp);
+        }
+        // Dedup: if two entries share a date, keep the one with higher solar
+        const seen = new Map();
+        for (const entry of history.dailyStats) {
+          const existing = seen.get(entry.date);
+          if (!existing || (entry.solarProduction || 0) > (existing.solarProduction || 0)) {
+            seen.set(entry.date, entry);
+          }
+        }
+        history.dailyStats = [...seen.values()];
+        history._migratedToLocalDates = true;
+        saveHistory(history);
+        console.error('[Migration v1] Done. Dates corrected.');
+      }
+
+      // V2 migration: idempotent recompute using getETDate.
+      // Fixes any entries where v1's blanket -1 shift was wrong (afternoon runs).
+      // Safe to re-run: getETDate always produces the correct local date.
+      if (history._migratedToLocalDates && !history._migratedToLocalDatesV2 && history.dailyStats?.length > 0) {
+        console.error('[Migration v2] Verifying dates via ET timezone');
+        let changed = false;
+        for (const entry of history.dailyStats) {
+          const correct = getETDate(entry.timestamp);
+          if (entry.date !== correct) {
+            console.error(`[Migration v2] ${entry.date} → ${correct} (ts: ${entry.timestamp})`);
+            entry.date = correct;
+            changed = true;
+          }
+        }
+        if (changed) {
+          // Dedup same-date entries (keep higher solar)
+          const seen = new Map();
+          for (const entry of history.dailyStats) {
+            const existing = seen.get(entry.date);
+            if (!existing || (entry.solarProduction || 0) > (existing.solarProduction || 0)) {
+              seen.set(entry.date, entry);
+            }
+          }
+          history.dailyStats = [...seen.values()];
+        }
+        history._migratedToLocalDatesV2 = true;
+        saveHistory(history);
+        console.error('[Migration v2] Done.');
+      }
+
+      return history;
     }
   } catch (error) {
     console.error('Error loading history:', error.message);
@@ -46,7 +123,7 @@ export function saveHistory(history) {
 export function addDailyStats(data) {
   const history = loadHistory();
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateStr();
 
   // Check if we already have stats for today
   const existingIndex = history.dailyStats.findIndex(s => s.date === today);
@@ -55,7 +132,7 @@ export function addDailyStats(data) {
   // Get YESTERDAY's stats specifically (not just any previous day)
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  const yesterdayStr = localDateStr(yesterday);
   const yesterdayStats = history.dailyStats.find(s => s.date === yesterdayStr);
 
   // Washer: calculate delta from yesterday's total
@@ -83,10 +160,10 @@ export function addDailyStats(data) {
   const elapsedChanged = currentElapsedMinutes !== yesterdayElapsedMinutes && currentElapsedMinutes > 0;
   const ovenUsed = existing?.ovenUsed || ovenUsedNow || elapsedChanged;
 
-  // Water: keep the max value seen today (API might return 0 early, then real value later)
+  // Water: use today's consumption (nearly complete at 10pm), fall back to yesterday's
   const waterGallons = Math.max(
     existing?.waterGallons || 0,
-    data.water?.dailyConsumption || 0
+    data.water?.todayConsumption || data.water?.dailyConsumption || 0
   );
 
   // Energy: keep the max value seen today
@@ -189,13 +266,22 @@ export function addDailyStats(data) {
 }
 
 /**
+ * Get today's stats
+ */
+export function getToday() {
+  const history = loadHistory();
+  const today = localDateStr();
+  return history.dailyStats.find(s => s.date === today) || null;
+}
+
+/**
  * Get yesterday's stats
  */
 export function getYesterday() {
   const history = loadHistory();
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  const yesterdayStr = localDateStr(yesterday);
 
   return history.dailyStats.find(s => s.date === yesterdayStr) || null;
 }
@@ -283,7 +369,7 @@ export function getWeeklyStats(weeksAgo = 0) {
   endOfWeek.setDate(startOfWeek.getDate() + 7);
 
   const weekStats = history.dailyStats.filter(s => {
-    const date = new Date(s.date);
+    const date = new Date(s.date + 'T00:00:00');
     return date >= startOfWeek && date < endOfWeek;
   });
 
@@ -311,8 +397,8 @@ export function getWeeklyStats(weeksAgo = 0) {
   });
 
   return {
-    weekStart: startOfWeek.toISOString().split('T')[0],
-    weekEnd: new Date(endOfWeek.getTime() - 1).toISOString().split('T')[0],
+    weekStart: localDateStr(startOfWeek),
+    weekEnd: localDateStr(new Date(endOfWeek.getTime() - 1)),
     daysRecorded: weekStats.length,
     ...sum
   };
@@ -403,7 +489,7 @@ export function getDailySparklineData(metric, days = 14) {
   for (let i = days - 1; i >= 0; i--) {
     const date = new Date();
     date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = localDateStr(date);
     const dayStat = history.dailyStats.find(s => s.date === dateStr);
 
     if (dayStat) {
