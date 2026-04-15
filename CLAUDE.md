@@ -4,13 +4,13 @@
 
 ## Project Overview
 
-This is a smart home automation system that integrates **Miele**, **LG ThinQ**, **HUUM Sauna**, **Phyn Water Monitor**, **A.O. Smith Water Heater**, **Tedee Smart Locks**, and **Tesla Powerwall/Solar** through MCP (Model Context Protocol) servers. Users can check status and control appliances using natural language or slash commands.
+This is a smart home automation system that integrates **Miele**, **LG ThinQ**, **HUUM Sauna**, **Phyn Water Monitor**, **A.O. Smith Water Heater**, **Tedee Smart Locks**, **Tesla Powerwall/Solar**, and **Zehnder Ventilation** through MCP (Model Context Protocol) servers. Users can check status and control appliances using natural language or slash commands.
 
 **Automated Email Reports:** Daily (10pm) and weekly (Saturday 8am) email reports with usage stats, historical comparisons, and trends.
 
 ## MCP Servers
 
-Seven MCP servers are configured in `.mcp.json`:
+Eight MCP servers are configured in `.mcp.json`:
 
 ### 1. Miele MCP Server
 - **Command:** `./miele-mcp-wrapper.sh` → `node index.js`
@@ -80,6 +80,18 @@ Seven MCP servers are configured in `.mcp.json`:
   - `get_live_status` - Get real-time power flow and battery status
   - `get_energy_history` - Get historical energy data (day/week/month/year)
 
+### 8. Zehnder Ventilation MCP Server
+- **Command:** `./zehnder-mcp-wrapper.sh` → `node zehnder-mcp-server.js`
+- **Server Name:** `zehnder-ventilation` v1.0.0
+- **Tools:**
+  - `get_ventilation_status` - Get sensor data (airflow, temperatures, humidities, CO2, filter)
+  - `get_ventilation_mode` - Get current settings (fan speed, temp profile, setpoint)
+  - `set_fan_speed` - Set fan speed (0=Away, 1=Low, 2=Medium, 3=High)
+  - `set_temp_profile` - Set temperature profile (0=Comfort, 1=Eco, 2=Warm)
+  - `set_temp_setpoint` - Set temperature setpoint in °C
+  - `set_boost_mode` - Enable/disable boost mode
+  - `set_away_mode` - Enable/disable away mode
+
 ## How to Query MCP Servers
 
 **IMPORTANT:** MCP servers use JSON-RPC over stdio, NOT CLI arguments.
@@ -96,6 +108,7 @@ node test-phyn-mcp.cjs      # Phyn water monitor status
 node test-aosmith-mcp.cjs   # A.O. Smith water heater status
 node test-tedee-mcp.cjs     # Tedee smart lock status
 node test-tesla-mcp.cjs     # Tesla Powerwall/Solar status
+node test-zehnder-mcp.cjs   # Zehnder ventilation status
 ```
 
 The test scripts implement proper JSON-RPC protocol and output device status. Use these for quick status checks instead of trying to call MCP binaries directly.
@@ -248,6 +261,31 @@ The test scripts implement proper JSON-RPC protocol and output device status. Us
 - Run `node tesla-setup.js` for initial authorization
 - Read-only access (energy_device_data scope)
 
+### Zehnder ComfoAir Q Ventilation
+| Device | API | Access |
+|--------|-----|--------|
+| ComfoAir Q (via ComfoConnect Pro) | Modbus TCP :502 | Slave ID 1 |
+
+**Status Fields (Zehnder - Input Registers 6-25):**
+- `airflow` - Current airflow in m³/h
+- `temperatures.room/extract/exhaust/outdoor/supply` - Temperatures in °C
+- `humidities.room/extract/exhaust/outdoor/supply` - Relative humidity %
+- `co2Zones[0-2]` - CO2 levels per zone in ppm
+- `filterDaysRemaining` - Days until filter replacement needed
+
+**Mode Fields (Zehnder - Holding Registers 0-4):**
+- `fanSpeed` - 0=Away, 1=Low, 2=Medium, 3=High
+- `tempProfile` - 0=Comfort, 1=Eco, 2=Warm
+- `profileMode` - 0=Auto, 1=Manual
+- `tempSetpoint` - Temperature setpoint in °C (stored x10)
+- `boostDuration` - Boost remaining minutes
+
+**Notes:**
+- Uses Modbus TCP via `modbus-serial` library
+- ComfoConnect Pro gateway bridges WiFi ↔ Modbus
+- Coil 6 = boost/party mode, Coil 7 = away mode
+- Temperature values from registers are x10 (divided in MCP server)
+
 ## Common Operations
 
 ### Check Laundry Status
@@ -347,6 +385,20 @@ The test scripts implement proper JSON-RPC protocol and output device status. Us
 1. Call Tesla `get_energy_history` with period ("day", "week", "month", "year")
 2. Show: solar production, grid import/export, home consumption, self-powered %
 
+### Check Ventilation Status
+1. Call Zehnder `get_ventilation_status` for sensor data
+2. Call Zehnder `get_ventilation_mode` for current settings
+3. Show: airflow, temperatures, humidities, CO2, filter status, fan speed
+
+### Set Fan Speed
+1. Call Zehnder `set_fan_speed` with speed (0=Away, 1=Low, 2=Medium, 3=High)
+2. Confirm speed change
+
+### Change Ventilation Mode
+1. Call Zehnder `set_temp_profile` with profile (0=Comfort, 1=Eco, 2=Warm)
+2. Optionally call `set_temp_setpoint` with temperature in °C
+3. Confirm settings change
+
 ## Slash Commands
 
 Available in `.claude/commands/`:
@@ -373,6 +425,7 @@ Available in `.claude/commands/`:
 - `/unlock_doors` - Unlock one or all doors
 - `/get_activity_logs` - Lock activity history
 - `/solar-status` - Solar production and battery status
+- `/ventilation-status` - Ventilation system status and air quality
 
 ## Quick Status Check Pattern
 
@@ -385,7 +438,8 @@ When user asks "check status" or similar:
 5. **For water heater:** Use A.O. Smith MCP `get_devices` or `get_device_status`
 6. **For locks:** Use Tedee MCP `sync_all_locks`
 7. **For solar/battery:** Use Tesla MCP `get_live_status`
-8. **For everything:** Call all seven servers and query all devices
+8. **For ventilation:** Use Zehnder MCP `get_ventilation_status` and `get_ventilation_mode`
+9. **For everything:** Call all eight servers and query all devices
 
 Format output with icons:
 - 🧺 Washer
@@ -397,6 +451,7 @@ Format output with icons:
 - 🚿 Water Heater
 - 🔐 Smart Lock
 - ☀️ Solar/Powerwall
+- 🌬️ Ventilation
 
 ## File Structure
 
@@ -427,6 +482,9 @@ Format output with icons:
 ├── tesla-mcp-wrapper.sh      # Tesla MCP wrapper script
 ├── tesla-setup.js            # Tesla OAuth setup script
 ├── test-tesla-mcp.cjs        # Tesla integration test
+├── zehnder-mcp-server.js     # Zehnder Ventilation MCP server (Modbus TCP)
+├── zehnder-mcp-wrapper.sh    # Zehnder MCP wrapper script
+├── test-zehnder-mcp.cjs      # Zehnder integration test
 ├── .tesla-tokens.json        # Tesla token cache (gitignored)
 ├── email-reports/            # Automated email reporting system
 │   ├── email-report.js       # Main entry point
@@ -461,6 +519,9 @@ From `.env`:
 - `TESLA_ACCESS_TOKEN` - Tesla OAuth access token (auto-managed)
 - `TESLA_TOKEN_EXPIRY` - Token expiration timestamp (auto-managed)
 - `TESLA_ENERGY_SITE_ID` - Energy site ID (auto-discovered)
+- `ZEHNDER_HOST` - ComfoConnect Pro IP address (Modbus TCP)
+- `ZEHNDER_PORT` - Modbus TCP port (default 502)
+- `ZEHNDER_SLAVE_ID` - Modbus slave ID (default 1)
 - `GMAIL_USER` / `GMAIL_APP_PASSWORD` - Gmail SMTP for email reports
 - `REPORT_RECIPIENT` - Email address for reports
 
@@ -482,7 +543,7 @@ From `.env`:
 
 ## Testing
 
-All seven MCP servers have been tested and are confirmed working:
+All eight MCP servers have been tested and are confirmed working:
 - `node test-lg-dryer.cjs` - Test LG ThinQ integration (washer + dryer)
 - `node test-miele-mcp.cjs` - Test Miele integration (oven, fridge, freezer)
 - `node test-huum-sauna.cjs` - Test HUUM sauna integration
@@ -490,6 +551,7 @@ All seven MCP servers have been tested and are confirmed working:
 - `node test-aosmith-mcp.cjs` - Test A.O. Smith water heater integration
 - `node test-tedee-mcp.cjs` - Test Tedee smart lock integration
 - `node test-tesla-mcp.cjs` - Test Tesla Powerwall/Solar integration
+- `node test-zehnder-mcp.cjs` - Test Zehnder ventilation integration
 
 ## Tesla Setup Instructions
 

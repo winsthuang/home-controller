@@ -223,6 +223,15 @@ export function addDailyStats(data) {
     lockActivitySources: data.smartLocks?.activityBreakdown?.locksBySource || null,
     unlockActivitySources: data.smartLocks?.activityBreakdown?.unlocksBySource || null,
 
+    // Ventilation (Zehnder)
+    ventilationRoomTemp: data.ventilation?.temperatures?.extract ?? null,
+    ventilationRoomHumidity: data.ventilation?.humidities?.extract ?? null,
+    ventilationOutdoorTemp: data.ventilation?.temperatures?.outdoor ?? null,
+    ventilationCo2: data.ventilation?.co2Zones?.[0] ?? null,
+    ventilationAirflow: data.ventilation?.airflow ?? null,
+    ventilationFilterDays: data.ventilation?.filterDaysRemaining ?? null,
+    ventilationFanSpeed: data.ventilation?.fanSpeed ?? null,
+
     // Tesla Solar & Battery
     solarProduction: Math.max(
       existing?.solarProduction || 0,

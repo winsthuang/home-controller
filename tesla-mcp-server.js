@@ -464,13 +464,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const timeSeries = (data.time_series || []).map(entry => ({
           timestamp: entry.timestamp,
           solar_energy: entry.solar_energy_exported || 0,  // kWh generated
-          battery_energy_charged: entry.battery_energy_imported || 0,
+          battery_energy_charged: (entry.battery_energy_imported_from_grid || 0) +
+                                  (entry.battery_energy_imported_from_solar || 0) +
+                                  (entry.battery_energy_imported_from_generator || 0),
           battery_energy_discharged: entry.battery_energy_exported || 0,
           grid_energy_imported: entry.grid_energy_imported || 0,
-          grid_energy_exported: entry.grid_energy_exported || 0,
-          home_energy: entry.consumer_energy_imported_from_grid +
-                       entry.consumer_energy_imported_from_solar +
-                       entry.consumer_energy_imported_from_battery || 0
+          grid_energy_exported: (entry.grid_energy_exported_from_solar || 0) +
+                                (entry.grid_energy_exported_from_battery || 0) +
+                                (entry.grid_energy_exported_from_generator || 0),
+          home_energy: (entry.consumer_energy_imported_from_grid || 0) +
+                       (entry.consumer_energy_imported_from_solar || 0) +
+                       (entry.consumer_energy_imported_from_battery || 0)
         }));
 
         // Calculate totals (sum is in Wh, convert to kWh)

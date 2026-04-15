@@ -55,6 +55,13 @@ function generateDailyExecutiveSummary(data, history) {
   if (data.waterHeater?.dailyUsage) {
     parts.push(`${data.waterHeater.dailyUsage.toFixed(1)} kWh heating`);
   }
+  if (data.ventilation?.temperatures?.extract != null) {
+    let indoorStr = `${data.ventilation.temperatures.extract}°C`;
+    if (data.ventilation.humidities?.extract != null) {
+      indoorStr += ` / ${data.ventilation.humidities.extract}% RH`;
+    }
+    parts.push(indoorStr);
+  }
 
   if (parts.length > 0) {
     lines.push(parts.join(' · '));
@@ -609,6 +616,24 @@ function generateMaintenanceForecast(data, history) {
     }
   }
 
+  // Ventilation filter predictions
+  if (data.ventilation?.filterDaysRemaining != null) {
+    const filterDays = data.ventilation.filterDaysRemaining;
+    if (filterDays <= 7) {
+      urgentItems.push({
+        icon: '🌬️',
+        message: `Ventilation filters: Replace within ${filterDays} days`,
+        detail: `Current: ${filterDays} days remaining`
+      });
+    } else if (filterDays <= 30) {
+      planAheadItems.push({
+        icon: '📅',
+        message: `Ventilation filters: ${filterDays} days remaining`,
+        detail: 'Plan filter replacement'
+      });
+    }
+  }
+
   // System health checks
   const yesterday = getYesterday();
   if (data.water?.pressure && yesterday?.waterPressure) {
@@ -628,6 +653,10 @@ function generateMaintenanceForecast(data, history) {
 
   if (data.smartLocks?.locks && data.smartLocks.locks.every(l => l.isConnected)) {
     noIssues.push('All devices connected and online');
+  }
+
+  if (data.ventilation?.filterDaysRemaining > 30) {
+    noIssues.push('Ventilation system operating normally');
   }
 
   // Efficiency opportunities
@@ -770,6 +799,103 @@ const STYLES = `
 `;
 
 /**
+ * Generate Ventilation & Air Quality section for daily report
+ */
+function generateDailyVentilationSection(data) {
+  const v = data.ventilation;
+  if (!v || v.airflow == null) {
+    return '';
+  }
+
+  const filterStatus = v.filterDaysRemaining != null && v.filterDaysRemaining > 0
+    ? (v.filterDaysRemaining < 7 ? `${v.filterDaysRemaining} days left ⚠️`
+      : v.filterDaysRemaining < 14 ? `${v.filterDaysRemaining} days left ⚠️`
+      : `${v.filterDaysRemaining} days left ✓`)
+    : 'N/A';
+
+  return `
+    <div class="section">
+      <div class="section-title">🌬️ VENTILATION</div>
+      <div class="box">
+<pre>Fan Speed:          ${v.fanSpeedLabel || 'N/A'} (${v.fanSpeed ?? 'N/A'})
+Mode:               ${v.tempProfileLabel || 'N/A'}
+Airflow:            ${v.airflow != null ? v.airflow + ' m³/h' : 'N/A'}
+Temp Setpoint:      ${v.tempSetpoint != null ? v.tempSetpoint + '°C' : 'N/A'}
+
+Temperatures:
+  Supply:           ${v.temperatures?.supply != null ? v.temperatures.supply + '°C' : 'N/A'}
+  Extract:          ${v.temperatures?.extract != null ? v.temperatures.extract + '°C' : 'N/A'}
+  Outdoor:          ${v.temperatures?.outdoor != null ? v.temperatures.outdoor + '°C' : 'N/A'}
+  Exhaust:          ${v.temperatures?.exhaust != null ? v.temperatures.exhaust + '°C' : 'N/A'}
+
+Humidity:
+  Supply:           ${v.humidities?.supply != null ? v.humidities.supply + '%' : 'N/A'}
+  Extract:          ${v.humidities?.extract != null ? v.humidities.extract + '%' : 'N/A'}
+  Outdoor:          ${v.humidities?.outdoor != null ? v.humidities.outdoor + '%' : 'N/A'}
+  Exhaust:          ${v.humidities?.exhaust != null ? v.humidities.exhaust + '%' : 'N/A'}
+
+Filter:             ${filterStatus}
+
+14-Day Extract Temp: <span class="sparkline">${generateSparkline(getDailySparklineData('ventilationRoomTemp', 14))}</span>
+14-Day Extract RH:   <span class="sparkline">${generateSparkline(getDailySparklineData('ventilationRoomHumidity', 14))}</span></pre>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Generate Ventilation section for weekly report
+ */
+function generateWeeklyVentilationSection(data) {
+  const v = data.ventilation;
+  if (!v || v.airflow == null) {
+    return '';
+  }
+
+  // Calculate this week's average from daily stats (using extract temp since no room sensor)
+  const recentTemps = getDailySparklineData('ventilationRoomTemp', 7);
+  const recentHumidity = getDailySparklineData('ventilationRoomHumidity', 7);
+
+  const validTemps = recentTemps.filter(t => t > 0);
+  const validHumidity = recentHumidity.filter(h => h > 0);
+
+  const avgTemp = validTemps.length > 0 ? validTemps.reduce((a, b) => a + b, 0) / validTemps.length : null;
+  const avgHumidity = validHumidity.length > 0 ? validHumidity.reduce((a, b) => a + b, 0) / validHumidity.length : null;
+
+  // Last week's averages
+  const lastWeekTemps = getDailySparklineData('ventilationRoomTemp', 14).slice(0, 7);
+  const lastWeekHumidity = getDailySparklineData('ventilationRoomHumidity', 14).slice(0, 7);
+  const validLastTemps = lastWeekTemps.filter(t => t > 0);
+  const validLastHumidity = lastWeekHumidity.filter(h => h > 0);
+  const lastAvgTemp = validLastTemps.length > 0 ? validLastTemps.reduce((a, b) => a + b, 0) / validLastTemps.length : null;
+  const lastAvgHumidity = validLastHumidity.length > 0 ? validLastHumidity.reduce((a, b) => a + b, 0) / validLastHumidity.length : null;
+
+  const tempChange = avgTemp && lastAvgTemp ? formatChangeArrow(avgTemp, lastAvgTemp) : 'N/A';
+  const humidityChange = avgHumidity && lastAvgHumidity ? formatChangeArrow(avgHumidity, lastAvgHumidity) : 'N/A';
+
+  const filterStatus = v.filterDaysRemaining != null && v.filterDaysRemaining > 0
+    ? `${v.filterDaysRemaining} days` : 'N/A';
+
+  return `
+    <div class="section">
+      <div class="section-title">🌬️ VENTILATION</div>
+      <div class="box">
+<pre>Avg Extract Temp:   ${avgTemp != null ? avgTemp.toFixed(1) + '°C' : 'N/A'}
+vs Last Week:       ${tempChange} ${lastAvgTemp != null ? `(${lastAvgTemp.toFixed(1)}°C)` : ''}
+
+Avg Extract RH:     ${avgHumidity != null ? Math.round(avgHumidity) + '%' : 'N/A'}
+vs Last Week:       ${humidityChange} ${lastAvgHumidity != null ? `(${Math.round(lastAvgHumidity)}%)` : ''}
+
+Filter Remaining:   ${filterStatus}
+
+12-Week Temp:       <span class="sparkline">${generateSparkline(getSparklineData('ventilationRoomTemp', 12))}</span>
+12-Week RH:         <span class="sparkline">${generateSparkline(getSparklineData('ventilationRoomHumidity', 12))}</span></pre>
+      </div>
+    </div>
+  `;
+}
+
+/**
  * Generate daily report HTML - simple, usage-focused format
  */
 export function generateDailyReport(data, history) {
@@ -910,6 +1036,8 @@ Today:             ${today ? (today.ovenUsed ? '1' : '0') + ' use' : 'N/A'}
 14-Day Trend:      <span class="sparkline">${generateSparkline(getDailySparklineData('ovenUsed', 14))}</span></pre>
       </div>
     </div>
+
+    ${generateDailyVentilationSection(data)}
 
     <div class="section">
       <div class="section-title">🔐 SECURITY STATUS</div>
@@ -1063,6 +1191,8 @@ vs 12-Week Avg:    ${avg12Week ? formatChangeArrow(thisWeek?.ovenUses || 0, avg1
       </div>
     </div>
 
+    ${generateWeeklyVentilationSection(data)}
+
     <div class="section">
       <div class="section-title">🔐 SMART LOCKS</div>
       <div class="box">
@@ -1143,6 +1273,17 @@ export function generatePlainText(data, reportType) {
   lines.push('🧖 SAUNA');
   lines.push(`   Week-to-date: ${weekToDate?.saunaSessions || 0} sessions`);
 
+  if (data.ventilation?.temperatures?.extract != null) {
+    lines.push('');
+    lines.push('🌬️ VENTILATION');
+    lines.push(`   Extract: ${data.ventilation.temperatures.extract}°C / ${data.ventilation.humidities?.extract || 'N/A'}% RH`);
+    lines.push(`   Outdoor: ${data.ventilation.temperatures?.outdoor || 'N/A'}°C`);
+    if (data.ventilation.filterDaysRemaining != null && data.ventilation.filterDaysRemaining > 0) {
+      lines.push(`   Filter: ${data.ventilation.filterDaysRemaining} days remaining`);
+    }
+  }
+
+  lines.push('');
   lines.push('🔐 SMART LOCKS');
   lines.push(`   Connected: ${data.smartLocks?.lockCount || 0}`);
   lines.push(`   Today's Locks: ${data.smartLocks?.todayLocks || 0}`);

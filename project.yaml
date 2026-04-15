@@ -1,0 +1,33 @@
+version: 1
+project_name: Home Controller
+purpose: Smart-home automation workspace with MCP servers, wrappers, device integrations, and scheduled email reports.
+preferred_entrypoints:
+  - Home Controller/CLAUDE.md
+  - Home Controller/INSTRUCTIONS.md
+  - Home Controller/README.md
+  - Home Controller/package.json
+instruction_files:
+  - Home Controller/CLAUDE.md
+  - Home Controller/INSTRUCTIONS.md
+  - Home Controller/README.md
+task_files:
+  - Home Controller/tasks/todo.md
+  - Home Controller/tasks/lessons.md
+sensitive_paths:
+  - Home Controller/.env
+  - Home Controller/.mcp.json
+  - Home Controller/.tesla-tokens.json
+  - Home Controller/tesla-private-key.pem
+  - Home Controller/tesla-public-key.pem
+generated_paths:
+  - Home Controller/node_modules
+  - Home Controller/logs
+  - Home Controller/data
+common_workflows:
+  - Use local test scripts to interact with MCP servers instead of calling MCP binaries with CLI arguments.
+  - Check email-reports and launchd when working on reporting or scheduling behavior.
+  - Use Home Controller/tasks for project-specific planning and follow-up.
+related_projects:
+  - claude-setup
+  - Jams
+  - engineering

@@ -20,11 +20,12 @@ function sendRequest(server, request) {
 /**
  * Create MCP client for a wrapper script
  */
-function createMCPClient(wrapperScript) {
+function createMCPClient(wrapperScript, extraEnv = {}) {
   return new Promise((resolve, reject) => {
     const server = spawn(wrapperScript, [], {
       stdio: ['pipe', 'pipe', 'pipe'],
-      cwd: paths.projectRoot
+      cwd: paths.projectRoot,
+      env: Object.keys(extraEnv).length > 0 ? { ...process.env, ...extraEnv } : undefined
     });
 
     let buffer = '';
@@ -840,20 +841,119 @@ async function collectTedeeData() {
 }
 
 /**
+ * Collect data from Zehnder Ventilation MCP (ComfoConnect Pro)
+ */
+async function collectZehnderData(retryCount = 0) {
+  const MAX_RETRIES = 1;
+  const RETRY_DELAY_MS = 3000;
+  try {
+    console.error(`[Zehnder] Starting data collection (attempt ${retryCount + 1}/${MAX_RETRIES + 1})`);
+
+    // Connect directly to ComfoConnect Pro (bypass nc proxy which only handles 1 connection)
+    const { server, responses } = await createMCPClient('./zehnder-mcp-wrapper.sh', {
+      ZEHNDER_HOST: '192.168.4.28',
+      ZEHNDER_PORT: '502'
+    });
+
+    await initializeMCP(server);
+
+    // Get ventilation status (sensors)
+    console.error('[Zehnder] Requesting ventilation status...');
+    const statusResponse = await callTool(server, responses, 'get_ventilation_status', {}, 80, 15000);
+
+    // Get ventilation mode (settings)
+    console.error('[Zehnder] Requesting ventilation mode...');
+    const modeResponse = await callTool(server, responses, 'get_ventilation_mode', {}, 81, 15000);
+
+    server.kill();
+
+    let statusData = {};
+    let modeData = {};
+
+    if (statusResponse?.result?.content?.[0]?.text) {
+      try {
+        statusData = JSON.parse(statusResponse.result.content[0].text);
+        if (statusData.error) {
+          console.error(`[Zehnder] Status returned error: ${statusData.message}`);
+        }
+      } catch (e) {
+        console.error(`[Zehnder] Failed to parse status response: ${statusResponse.result.content[0].text.substring(0, 200)}`);
+      }
+    } else {
+      console.error(`[Zehnder] No status response received (response: ${JSON.stringify(statusResponse)?.substring(0, 200)})`);
+    }
+
+    if (modeResponse?.result?.content?.[0]?.text) {
+      try {
+        modeData = JSON.parse(modeResponse.result.content[0].text);
+        if (modeData.error) {
+          console.error(`[Zehnder] Mode returned error: ${modeData.message}`);
+        }
+      } catch (e) {
+        console.error(`[Zehnder] Failed to parse mode response: ${modeResponse.result.content[0].text.substring(0, 200)}`);
+      }
+    } else {
+      console.error(`[Zehnder] No mode response received (response: ${JSON.stringify(modeResponse)?.substring(0, 200)})`);
+    }
+
+    // If status data contains an error (Modbus connection failed), mark as failed
+    // If Modbus connection failed, retry
+    if (statusData.error || (!statusResponse && !modeResponse)) {
+      const errorMsg = statusData.message || 'No response received';
+      if (retryCount < MAX_RETRIES) {
+        console.error(`[Zehnder] Modbus error: ${errorMsg}. Retrying after ${RETRY_DELAY_MS}ms...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+        return collectZehnderData(retryCount + 1);
+      }
+      return { success: false, error: `Modbus error: ${errorMsg}` };
+    }
+
+    const result = {
+      success: true,
+      airflow: statusData.airflow ?? null,
+      temperatures: statusData.temperatures || {},
+      humidities: statusData.humidities || {},
+      co2Zones: statusData.co2Zones || [],
+      filterDaysRemaining: statusData.filterDaysRemaining ?? null,
+      fanSpeed: modeData.fanSpeed ?? null,
+      fanSpeedLabel: modeData.fanSpeedLabel || null,
+      tempProfile: modeData.tempProfile ?? null,
+      tempProfileLabel: modeData.tempProfileLabel || null,
+      profileMode: modeData.profileMode ?? null,
+      tempSetpoint: modeData.tempSetpoint ?? null,
+      boostDuration: modeData.boostDuration ?? 0
+    };
+
+    console.error(`[Zehnder] Data collection successful. Airflow: ${result.airflow} m³/h, Extract: ${result.temperatures?.extract}°C, Filter: ${result.filterDaysRemaining} days`);
+
+    return result;
+  } catch (error) {
+    console.error(`[Zehnder] Error: ${error.message}`);
+    if (retryCount < MAX_RETRIES) {
+      console.error(`[Zehnder] Retrying after ${RETRY_DELAY_MS}ms...`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+      return collectZehnderData(retryCount + 1);
+    }
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Collect data from all MCP servers in parallel
  */
 export async function collectAllData() {
   const timestamp = new Date().toISOString();
 
   // Run all collectors in parallel
-  const [lgData, mieleData, huumData, phynData, aosmithData, tedeeData, teslaData] = await Promise.all([
+  const [lgData, mieleData, huumData, phynData, aosmithData, tedeeData, teslaData, zehnderData] = await Promise.all([
     collectLGData().catch(e => ({ success: false, error: e.message })),
     collectMieleData().catch(e => ({ success: false, error: e.message })),
     collectHUUMData().catch(e => ({ success: false, error: e.message })),
     collectPhynData().catch(e => ({ success: false, error: e.message })),
     collectAOSmithData().catch(e => ({ success: false, error: e.message })),
     collectTedeeData().catch(e => ({ success: false, error: e.message, locks: [], lockCount: 0, todayLocks: 0, todayUnlocks: 0 })),
-    collectTeslaData().catch(e => ({ success: false, error: e.message }))
+    collectTeslaData().catch(e => ({ success: false, error: e.message })),
+    collectZehnderData().catch(e => ({ success: false, error: e.message }))
   ]);
 
   // Collect any errors
@@ -865,6 +965,7 @@ export async function collectAllData() {
   if (!aosmithData.success) errors.push(`A.O. Smith: ${aosmithData.error}`);
   if (!tedeeData.success) errors.push(`Tedee: ${tedeeData.error}`);
   if (!teslaData.success) errors.push(`Tesla: ${teslaData.error}`);
+  if (!zehnderData.success) errors.push(`Zehnder: ${zehnderData.error}`);
 
   return {
     timestamp,
@@ -938,6 +1039,19 @@ export async function collectAllData() {
       // Value estimates
       solarValue: teslaData.solarValue || 0,
       gridCost: teslaData.gridCost || 0
+    },
+    ventilation: {
+      airflow: zehnderData.airflow || null,
+      temperatures: zehnderData.temperatures || {},
+      humidities: zehnderData.humidities || {},
+      co2Zones: zehnderData.co2Zones || [],
+      filterDaysRemaining: zehnderData.filterDaysRemaining || null,
+      fanSpeed: zehnderData.fanSpeed ?? null,
+      fanSpeedLabel: zehnderData.fanSpeedLabel || null,
+      tempProfile: zehnderData.tempProfile ?? null,
+      tempProfileLabel: zehnderData.tempProfileLabel || null,
+      profileMode: zehnderData.profileMode ?? null,
+      tempSetpoint: zehnderData.tempSetpoint || null
     },
     errors
   };
@@ -1087,7 +1201,29 @@ export function generateMaintenanceAlerts(currentData, history) {
     }
   }
 
-  // 5. SYSTEM HEALTH ALERTS
+  // 5. VENTILATION ALERTS
+  if (currentData.ventilation?.filterDaysRemaining != null) {
+    const filterDays = currentData.ventilation.filterDaysRemaining;
+    if (filterDays < alertThresholds.ventilation.filterCriticalDays) {
+      alerts.push({
+        severity: 'critical',
+        category: 'filter',
+        device: 'Ventilation',
+        message: `Filter replacement overdue (${filterDays} days remaining)`,
+        action: 'Replace filters immediately'
+      });
+    } else if (filterDays < alertThresholds.ventilation.filterWarningDays) {
+      alerts.push({
+        severity: 'warning',
+        category: 'filter',
+        device: 'Ventilation',
+        message: `Filter replacement needed soon (${filterDays} days remaining)`,
+        action: 'Plan filter replacement'
+      });
+    }
+  }
+
+  // 6. SYSTEM HEALTH ALERTS
   if (currentData.smartLocks?.locks) {
     for (const lock of currentData.smartLocks.locks) {
       if (!lock.isConnected) {

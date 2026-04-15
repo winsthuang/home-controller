@@ -130,6 +130,11 @@ export const alertThresholds = {
     freezerMin: -20,  // °C
     freezerMax: -16,  // °C
     fluctuationThreshold: 2  // °C change in 24h
+  },
+  ventilation: {
+    filterWarningDays: 14,   // days remaining - plan replacement
+    filterCriticalDays: 7,   // days remaining - replace immediately
+    co2Warning: 1000         // ppm - elevated CO2
   }
 };
 
