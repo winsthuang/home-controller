@@ -78,3 +78,6 @@ logs/
 
 # Launchd plists (contain user-specific paths)
 launchd/*.plist
+
+# Scrub config can contain real sensitive identifiers — keep local only
+scripts/scrub.json

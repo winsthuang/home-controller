@@ -2,16 +2,13 @@
 
 # Suppress dotenv v17 startup banner from polluting stdout (MCP needs clean JSON on stdout)
 export DOTENV_CONFIG_QUIET=true
-# Wrapper script for Phyn Water Monitor MCP server
-# This ensures the environment variables are loaded before starting the server
+# Wrapper script for Rachio Sprinkler Controller MCP server
+# Loads environment variables from .env before starting the server
 
-# Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# Load environment variables from .env file
 if [ -f "$SCRIPT_DIR/.env" ]; then
   export $(grep -v '^#' "$SCRIPT_DIR/.env" | xargs)
 fi
 
-# Start the MCP server
-exec node "$SCRIPT_DIR/phyn-mcp-server.js"
+exec node "$SCRIPT_DIR/rachio-mcp-server.js"

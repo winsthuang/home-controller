@@ -88,8 +88,8 @@ function loadCachedTokens() {
 function saveCachedTokens() {
   try {
     writeFileSync(TOKEN_FILE, JSON.stringify({
-      access_token: TESLA_ACCESS_TOKEN,
-      refresh_token: TESLA_REFRESH_TOKEN,
+      access_token=<REDACTED>,
+      refresh_token=<REDACTED>,
       expiry: TESLA_TOKEN_EXPIRY,
       energy_site_id: TESLA_ENERGY_SITE_ID,
       updated: new Date().toISOString()
@@ -108,8 +108,8 @@ async function refreshAccessToken() {
     const response = await axios.post(TESLA_AUTH_URL, {
       grant_type: 'refresh_token',
       client_id: TESLA_CLIENT_ID,
-      client_secret: TESLA_CLIENT_SECRET,
-      refresh_token: TESLA_REFRESH_TOKEN
+      client_secret=<REDACTED>,
+      refresh_token=<REDACTED>
     }, {
       headers: {
         'Content-Type': 'application/json'

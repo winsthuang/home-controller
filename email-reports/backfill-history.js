@@ -165,7 +165,7 @@ async function backfillPhyn(gapDates) {
       const duration = date.replace(/-/g, '/');
 
       const response = await callTool(server, responses, 'get_consumption',
-        { device_id: '28F53743B8D8', duration }, requestId++);
+        { device_id: '<PHYN-PP2-ID>', duration }, requestId++);
 
       const data = parseResponse(response);
       if (data && data.water_consumption !== undefined) {

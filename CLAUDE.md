@@ -118,8 +118,8 @@ The test scripts implement proper JSON-RPC protocol and output device status. Us
 ### LG ThinQ Devices
 | Device | ID | Model | Type |
 |--------|----|----|------|
-| Washer | `211e423487fc7b59e4b2aa8eecd763f09365f92db4137992496a776f17cb5112` | FAFXU22027 | DEVICE_WASHER |
-| Dryer | `930ce551cecf46404810aed03560471f42cb50ab86af8378e209aab1d2a4b9a1` | BDH_D30007_US | DEVICE_DRYER |
+| Washer | `<LG-WASHER-ID>` | FAFXU22027 | DEVICE_WASHER |
+| Dryer | `<LG-DRYER-ID>` | BDH_D30007_US | DEVICE_DRYER |
 
 **Status Fields (LG):**
 - `runState.currentState` - POWER_OFF, RUNNING, END, etc.
@@ -129,9 +129,9 @@ The test scripts implement proper JSON-RPC protocol and output device status. Us
 ### Miele Devices
 | Device | ID | Model | Type |
 |--------|----|----|------|
-| Oven | `000192190778` | H7263BP | Oven |
-| Refrigerator | `000712269805` | KS 7793 D | Refrigerator |
-| Freezer | `000712335856` | FNS 7794 E | Freezer |
+| Oven | `<MIELE-OVEN-ID>` | H7263BP | Oven |
+| Refrigerator | `<MIELE-FRIDGE-ID>` | KS 7793 D | Refrigerator |
+| Freezer | `<MIELE-FREEZER-ID>` | FNS 7794 E | Freezer |
 
 **Status Fields (Miele):**
 - `state.status.value_localized` - "Off", "In use", etc.
@@ -162,10 +162,10 @@ The test scripts implement proper JSON-RPC protocol and output device status. Us
 ### Phyn Water Monitor
 | Device | ID | Type |
 |--------|----|----|
-| Phyn Plus | `28F53743B8D8` | PP2 (main shutoff valve) |
-| HVAC #1 | `28F53746B987` | PW1 (smart sensor) |
-| Hot Water Heater | `28F537468645` | PW1 (smart sensor) |
-| HVAC #2 | `28F53746B9A6` | PW1 (smart sensor) |
+| Phyn Plus | `<PHYN-PP2-ID>` | PP2 (main shutoff valve) |
+| HVAC #1 | `<PHYN-HVAC1-ID>` | PW1 (smart sensor) |
+| Hot Water Heater | `<PHYN-WATER-HEATER-ID>` | PW1 (smart sensor) |
+| HVAC #2 | `<PHYN-HVAC2-ID>` | PW1 (smart sensor) |
 
 **Status Fields (Phyn):**
 - `pressure.mean` - Average water pressure (PSI)
@@ -299,13 +299,13 @@ The test scripts implement proper JSON-RPC protocol and output device status. Us
 3. Show: status, temperature (if applicable), alerts
 
 ### Check Oven Status
-- Device ID: `000192190778`
+- Device ID: `<MIELE-OVEN-ID>`
 - Call Miele `get_device_status` with oven ID
 - Show: status, temperature, program, remaining time
 
 ### Check Fridge/Freezer Status
-- Fridge ID: `000712269805`
-- Freezer ID: `000712335856`
+- Fridge ID: `<MIELE-FRIDGE-ID>`
+- Freezer ID: `<MIELE-FREEZER-ID>`
 - Call Miele `get_device_status` for each
 - Show: current temp, target temp, status, door/failure signals
 
@@ -334,7 +334,7 @@ The test scripts implement proper JSON-RPC protocol and output device status. Us
 
 ### Check Water Status
 1. Call Phyn `get_devices` to list all water monitors
-2. Call Phyn `get_device_status` for each device (especially Phyn Plus: `28F53743B8D8`)
+2. Call Phyn `get_device_status` for each device (especially Phyn Plus: `<PHYN-PP2-ID>`)
 3. Show: pressure, temperature, flow, valve status, online status
 
 ### Get Water Consumption Report
@@ -343,7 +343,7 @@ The test scripts implement proper JSON-RPC protocol and output device status. Us
 3. Show: total gallons, fixture breakdown if available
 
 ### Control Water Shutoff (Emergency)
-1. Call Phyn `shutoff_valve` with device_id `28F53743B8D8` and action `close`
+1. Call Phyn `shutoff_valve` with device_id `<PHYN-PP2-ID>` and action `close`
 2. To restore water, call with action `open`
 
 ### Check Water Heater Status

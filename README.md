@@ -1,6 +1,6 @@
 # Home Controller - Smart Home MCP Integration
 
-A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, Phyn Water Monitor, A.O. Smith Water Heater, Tedee Smart Lock, and Tesla Powerwall/Solar appliances through Claude Code using the Model Context Protocol (MCP).
+A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, Phyn Water Monitor, A.O. Smith Water Heater, Tedee Smart Lock, Tesla Powerwall/Solar, Zehnder ventilation, and Rachio sprinkler appliances through Claude Code using the Model Context Protocol (MCP).
 
 ## Features
 
@@ -47,6 +47,19 @@ A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, Ph
 - Support for multiple locks
 - Requires Tedee bridge for remote access
 
+### Rachio Sprinkler Integration (Custom Node.js MCP Server)
+- List Rachio controllers, zones, and schedule rules
+- Get current watering state (which zone, time remaining)
+- Manually water a zone for N minutes (start_zone)
+- Sequentially water multiple zones (start_multiple_zones)
+- Stop any active watering immediately
+- Set or clear a rain delay (max 7 days)
+- Turn the controller on/off (standby)
+- Enable/disable individual zones
+- Trigger or skip schedule rules
+- Pull weather forecast for the controller location
+- Pull event log for any time range
+
 ### Tesla Powerwall/Solar Integration (Custom Node.js MCP Server)
 - Monitor Powerwall battery level and status
 - Real-time solar production data
@@ -86,6 +99,9 @@ A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, Ph
 - `/unlock_doors` - Unlock one or all doors
 - `/get_activity_logs` - View lock activity history
 - `/solar-status` - Check Powerwall battery and solar production
+- `/sprinkler-status` - Check Rachio controller, zones, and current watering
+- `/water-zone` - Manually water a Rachio zone for N minutes
+- `/sprinkler-rain-delay` - Set or clear a Rachio rain delay
 
 ## Prerequisites
 
@@ -121,7 +137,13 @@ A unified home automation system for controlling Miele, LG ThinQ, HUUM Sauna, Ph
    - Personal Access Key (PAK) from Tedee Portal
    - Node.js v18+ installed
 
-7. **For Tesla Powerwall/Solar:**
+7. **For Rachio Sprinkler:**
+   - Rachio smart sprinkler controller (Gen 1/2/3 or newer)
+   - Rachio app account
+   - Personal API token from Rachio app → Account Settings → "Get API Key"
+   - Node.js v18+ installed
+
+8. **For Tesla Powerwall/Solar:**
    - Tesla Powerwall and/or Solar installation
    - Tesla account (same as Tesla app)
    - Tesla Developer Portal application
@@ -309,6 +331,31 @@ The Tedee MCP server uses the same Node.js dependencies:
 ```bash
 npm install
 ```
+
+### Rachio Sprinkler Setup
+
+#### Step 1: Get Your Rachio API Key
+
+1. Open the Rachio mobile app (iOS/Android)
+2. Go to Account Settings → "Get API Key"
+3. Copy the personal API token (UUID format)
+
+#### Step 2: Configure Rachio Environment
+
+1. Edit `.env` and add your credentials:
+   ```env
+   RACHIO_API_KEY=your_api_key_here
+   ```
+
+**Note:** The Rachio Public API uses a simple Bearer token. The token never expires unless rotated in the app.
+
+#### Step 3: Test Integration
+
+```bash
+node test-rachio-mcp.cjs
+```
+
+This will list devices on your account. If no Rachio controllers are linked yet, the test will say so — link a controller in the app and re-run.
 
 ### Tesla Powerwall/Solar Setup
 

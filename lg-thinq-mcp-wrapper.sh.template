@@ -1,4 +1,7 @@
 #!/bin/bash
+
+# Suppress dotenv v17 startup banner from polluting stdout (MCP needs clean JSON on stdout)
+export DOTENV_CONFIG_QUIET=true
 # Wrapper script for LG ThinQ MCP server
 # This sets the required environment variables before starting the server
 

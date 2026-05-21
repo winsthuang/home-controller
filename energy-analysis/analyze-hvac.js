@@ -268,7 +268,7 @@ async function collectWeatherData() {
   console.log('Step 2: Collecting weather data from Open-Meteo...');
 
   const url = 'https://archive-api.open-meteo.com/v1/archive' +
-    '?latitude=41.07&longitude=-73.71' +
+    '?latitude=<HOME-LAT>&longitude=<HOME-LNG>' +
     `&start_date=${START_DATE}&end_date=${END_DATE}` +
     '&daily=temperature_2m_max,temperature_2m_min,temperature_2m_mean,' +
     'wind_speed_10m_max,wind_gusts_10m_max' +

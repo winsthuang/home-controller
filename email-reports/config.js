@@ -85,16 +85,16 @@ export const paths = {
 // Device IDs (from CLAUDE.md)
 export const deviceIds = {
   lg: {
-    washer: '211e423487fc7b59e4b2aa8eecd763f09365f92db4137992496a776f17cb5112',
-    dryer: '930ce551cecf46404810aed03560471f42cb50ab86af8378e209aab1d2a4b9a1'
+    washer: '<LG-WASHER-ID>',
+    dryer: '<LG-DRYER-ID>'
   },
   miele: {
-    oven: '000192190778',
-    refrigerator: '000712269805',
-    freezer: '000712335856'
+    oven: '<MIELE-OVEN-ID>',
+    refrigerator: '<MIELE-FRIDGE-ID>',
+    freezer: '<MIELE-FREEZER-ID>'
   },
   phyn: {
-    phynPlus: '28F53743B8D8'
+    phynPlus: '<PHYN-PP2-ID>'
   }
 };
 

@@ -5,7 +5,7 @@ description: Get water consumption report (daily/weekly/monthly)
 Use the Phyn MCP tools to generate a water consumption report:
 
 1. Call `get_devices` to list all Phyn devices
-2. For the Phyn Plus device (28F53743B8D8), call `get_consumption` with duration parameter
+2. For the Phyn Plus device (<PHYN-PP2-ID>), call `get_consumption` with duration parameter
 
 Duration formats:
 - Daily: YYYY/MM/DD (e.g., 2026/01/05)

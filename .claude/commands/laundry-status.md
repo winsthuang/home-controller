@@ -9,8 +9,8 @@ Use the LG ThinQ MCP tools to check the status of all washers and dryers:
 2. For each laundry device, call `get_device_status` with the device_id
 
 Device IDs (for reference):
-- Washer: 211e423487fc7b59e4b2aa8eecd763f09365f92db4137992496a776f17cb5112
-- Dryer: 930ce551cecf46404810aed03560471f42cb50ab86af8378e209aab1d2a4b9a1
+- Washer: <LG-WASHER-ID>
+- Dryer: <LG-DRYER-ID>
 
 Show for each device:
 - Current state (runState.currentState: POWER_OFF, RUNNING, END, etc.)

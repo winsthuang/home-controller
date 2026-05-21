@@ -17,7 +17,7 @@ Use MCP tools to get a complete status of all appliances:
 
 **Phyn Water Monitor:**
 1. Call `get_devices` to list all Phyn devices
-2. Call `get_device_status` for the Phyn Plus (device_id: 28F53743B8D8)
+2. Call `get_device_status` for the Phyn Plus (device_id: <PHYN-PP2-ID>)
 
 **A.O. Smith Water Heater:**
 1. Call `get_devices` to list all water heaters

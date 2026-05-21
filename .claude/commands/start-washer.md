@@ -5,7 +5,7 @@ description: Show washer info (use natural language to actually start)
 
 Use the LG ThinQ MCP tools to help the user start the washer:
 
-1. Call `get_device_status` for the washer (device_id: 211e423487fc7b59e4b2aa8eecd763f09365f92db4137992496a776f17cb5112)
+1. Call `get_device_status` for the washer (device_id: <LG-WASHER-ID>)
 2. Call `get_device_available_controls` with device_type "DEVICE_WASHER" and the device_id to show available programs
 
 Show:

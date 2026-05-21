@@ -231,8 +231,8 @@ function updateEnvFile(tokens, siteId) {
 function saveTokenCache(tokens, siteId) {
   const cachePath = join(__dirname, '.tesla-tokens.json');
   const data = {
-    access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token,
+    access_token=<REDACTED>,
+    refresh_token=<REDACTED>,
     expiry: Date.now() + tokens.expires_in * 1000,
     energy_site_id: siteId,
     updated: new Date().toISOString()

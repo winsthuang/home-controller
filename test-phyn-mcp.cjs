@@ -48,7 +48,7 @@ const getDeviceStatusRequest = {
   params: {
     name: "get_device_status",
     arguments: {
-      device_id: "28F53743B8D8"  // Phyn Plus
+      device_id: "<PHYN-PP2-ID>"  // Phyn Plus
     }
   }
 };
@@ -61,7 +61,7 @@ const getConsumptionRequest = {
   params: {
     name: "get_consumption",
     arguments: {
-      device_id: "28F53743B8D8",  // Phyn Plus
+      device_id: "<PHYN-PP2-ID>",  // Phyn Plus
       duration: "2026/01"  // Current month
     }
   }

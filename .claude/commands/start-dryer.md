@@ -5,7 +5,7 @@ description: Show dryer info (use natural language to actually start)
 
 Use the LG ThinQ MCP tools to help the user start the dryer:
 
-1. Call `get_device_status` for the dryer (device_id: 930ce551cecf46404810aed03560471f42cb50ab86af8378e209aab1d2a4b9a1)
+1. Call `get_device_status` for the dryer (device_id: <LG-DRYER-ID>)
 2. Call `get_device_available_controls` with device_type "DEVICE_DRYER" and the device_id to show available programs
 
 Show:

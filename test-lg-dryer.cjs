@@ -49,7 +49,7 @@ const getDryerStatusRequest = {
   params: {
     name: "get_device_status",
     arguments: {
-      device_id: "930ce551cecf46404810aed03560471f42cb50ab86af8378e209aab1d2a4b9a1"
+      device_id: "<LG-DRYER-ID>"
     }
   }
 };
@@ -62,7 +62,7 @@ const getWasherStatusRequest = {
   params: {
     name: "get_device_status",
     arguments: {
-      device_id: "211e423487fc7b59e4b2aa8eecd763f09365f92db4137992496a776f17cb5112"
+      device_id: "<LG-WASHER-ID>"
     }
   }
 };

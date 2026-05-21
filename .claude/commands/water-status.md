@@ -8,10 +8,10 @@ Use the Phyn MCP tools to check the status of all water monitoring devices:
 2. For each device, call `get_device_status` with the device_id
 
 Device IDs (for reference):
-- Phyn Plus (PP2): 28F53743B8D8
-- HVAC #1 (PW1): 28F53746B987
-- Hot Water Heater (PW1): 28F537468645
-- HVAC #2 (PW1): 28F53746B9A6
+- Phyn Plus (PP2): <PHYN-PP2-ID>
+- HVAC #1 (PW1): <PHYN-HVAC1-ID>
+- Hot Water Heater (PW1): <PHYN-WATER-HEATER-ID>
+- HVAC #2 (PW1): <PHYN-HVAC2-ID>
 
 Show for each device:
 - Device name and type
